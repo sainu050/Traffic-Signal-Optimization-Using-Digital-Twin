@@ -1,16 +1,11 @@
-# React + Vite
+# Traffic-Signal-Optimization-Using-Digital-Twin
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A Digital Twin-based adaptive traffic signal optimization system using SUMO simulation, rule-based control, and a modern React web dashboard for real-time traffic monitoring and signal management.
 
-Currently, two official plugins are available:
+## Project Structure
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+This repository contains the front-end dashboard built with React and Vite, featuring:
+- Live traffic condition monitoring
+- Traffic signal status previews
+- Public user and operator login interfaces
+- Incident reporting pages
