@@ -4,8 +4,7 @@ A Digital Twin-based adaptive traffic signal optimization system using SUMO simu
 
 ## Project Structure
 
-This repository contains the front-end dashboard built with React and Vite, featuring:
-- Live traffic condition monitoring
-- Traffic signal status previews
-- Public user and operator login interfaces
-- Incident reporting pages
+This repository contains the initial front-end views built with React and Vite, featuring:
+- **Landing Page**: Overview of the UrbanFlow system, key features, and role definitions.
+- **Login Page**: Role-based authentication tabs for Public users, Control Centre Operators, and System Administrators.
+- **Registration Page**: Sign-up interface for Public users.
