@@ -52,6 +52,17 @@ export default function App() {
   // Admin Dashboard States
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [intersections, setIntersections] = useState(initialIntersections);
+  const [controllers, setControllers] = useState([
+    { id: 'CTRL-A01', name: 'Westside Controller (TraCI Model A)', type: 'Adaptive', status: 'Online', assignedTo: 1 },
+    { id: 'CTRL-A02', name: 'Central Hub Controller (Model A+)', type: 'Adaptive', status: 'Online', assignedTo: 2 },
+    { id: 'CTRL-B01', name: 'Harbor Edge Controller (Model B)', type: 'Rule-Based', status: 'Online', assignedTo: 3 },
+    { id: 'CTRL-B02', name: 'Expressway Bypass Controller (Model B)', type: 'Manual Override', status: 'Online', assignedTo: 5 },
+    { id: 'CTRL-C01', name: 'Downtown Backup Unit (Model C)', type: 'Fail-Safe Mode', status: 'Offline', assignedTo: null },
+    { id: 'CTRL-C02', name: 'Suburban Loop Controller', type: 'Adaptive', status: 'Online', assignedTo: null },
+  ]);
+  const [selectedIntersectionId, setSelectedIntersectionId] = useState('');
+  const [selectedControllerId, setSelectedControllerId] = useState('');
   const [ruleAdaptive, setRuleAdaptive] = useState(true);
   const [ruleEmergency, setRuleEmergency] = useState(true);
   const [ruleCongestion, setRuleCongestion] = useState(false);
@@ -156,6 +167,36 @@ export default function App() {
         addToast('Invalid credentials. Please try demo settings.', 'error');
       }
     }, 800);
+  };
+
+  const handleAssignController = (e) => {
+    e.preventDefault();
+    if (!selectedIntersectionId || !selectedControllerId) {
+      addToast('Please select both an intersection and a controller.', 'error');
+      return;
+    }
+
+    setControllers(prev => prev.map(c => {
+      // Clear assignment if already assigned to this intersection
+      if (c.assignedTo === parseInt(selectedIntersectionId)) {
+        return { ...c, assignedTo: null };
+      }
+      // Assign the selected controller
+      if (c.id === selectedControllerId) {
+        return { ...c, assignedTo: parseInt(selectedIntersectionId) };
+      }
+      return c;
+    }));
+
+    const intersectionName = intersections.find(i => i.id === parseInt(selectedIntersectionId))?.name || 'Intersection';
+    
+    addToast(`Successfully assigned ${selectedControllerId} to ${intersectionName}!`, 'success');
+    
+    // Add to activity log
+    setControllerLogs(prev => [
+      { time: new Date().toLocaleTimeString(), event: `Assigned controller ${selectedControllerId} to intersection "${intersectionName}"` },
+      ...prev
+    ]);
   };
 
   const checkPasswordStrength = (val) => {
@@ -810,7 +851,7 @@ export default function App() {
             <div className="admin-sidebar-header">
               <div className="admin-sidebar-logo">
                 <div className="logo-icon">
-                  <TrafficCone size={18} />
+                  <i className="fas fa-traffic-light"></i>
                 </div>
                 <span className="logo-text" style={{ color: 'var(--admin-text-main)' }}>Urban<span style={{ color: 'var(--admin-accent-cyan)' }}>Flow</span></span>
               </div>
@@ -873,11 +914,6 @@ export default function App() {
                 </h2>
               </div>
               <div className="admin-topbar-actions">
-                <div className="admin-search-wrapper">
-                  <Search className="icon" size={16} />
-                  <input className="admin-search-input" type="text" placeholder="Global system search..." />
-                </div>
-
                 <button style={{ background: 'none', border: 'none', color: 'var(--admin-text-muted)', cursor: 'pointer', position: 'relative' }}>
                   <Bell size={18} />
                   <span style={{ position: 'absolute', top: '-4px', right: '-4px', width: '6px', height: '6px', backgroundColor: 'var(--danger)', borderRadius: '50%' }}></span>
@@ -897,259 +933,458 @@ export default function App() {
 
             {/* Dashboard Contents */}
             <main className="admin-content-area">
-              <div className="admin-title-row">
-                <h1 style={{ fontSize: '24px', fontWeight: '800', letterSpacing: '-0.02em' }}>
-                  ITS Dashboard Control Panel
-                </h1>
-                <div className="admin-subtitle">
-                  Real-time status overview of active nodes and adaptive signal controllers.
-                </div>
-              </div>
-
-              {/* Statistics Grid */}
-              <div className="admin-stats-grid">
-                {[
-                  { label: 'Total Intersections', value: '12 Active', icon: <Route size={18} />, color: 'var(--admin-accent-blue)', bg: 'rgba(59, 130, 246, 0.1)' },
-                  { label: 'Active Controllers', value: '12 / 12', icon: <Sliders size={18} />, color: 'var(--admin-accent-cyan)', bg: 'rgba(6, 182, 212, 0.1)' },
-                  { label: 'Active Vehicles', value: vehiclesCount, icon: <Activity size={18} />, color: 'var(--admin-accent-purple)', bg: 'rgba(168, 85, 247, 0.1)' },
-                  { label: 'Adaptive Signals', value: ruleAdaptive ? 'Enabled' : 'Disabled', icon: <ToggleLeft size={18} />, color: 'var(--admin-accent-green)', bg: 'rgba(16, 185, 129, 0.1)' },
-                  { label: 'System Health', value: '100% OK', icon: <Server size={18} />, color: 'var(--admin-accent-cyan)', bg: 'rgba(6, 182, 212, 0.1)' },
-                  { label: 'Traffic Efficiency', value: '+14.2%', icon: <Star size={18} />, color: 'var(--admin-accent-green)', bg: 'rgba(16, 185, 129, 0.1)' },
-                ].map((stat, idx) => (
-                  <div key={idx} className="admin-stat-card">
-                    <div className="admin-stat-card-header">
-                      <span style={{ fontSize: '11px', color: 'var(--admin-text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{stat.label}</span>
-                      <div className="admin-stat-icon-box" style={{ background: stat.bg, color: stat.color }}>
-                        {stat.icon}
-                      </div>
+              {activeTab === 'dashboard' && (
+                <>
+                  <div className="admin-title-row">
+                    <h1 style={{ fontSize: '24px', fontWeight: '800', letterSpacing: '-0.02em' }}>
+                      ITS Dashboard Control Panel
+                    </h1>
+                    <div className="admin-subtitle">
+                      Real-time status overview of active nodes and adaptive signal controllers.
                     </div>
-                    <div className="admin-stat-card-value">{stat.value}</div>
                   </div>
-                ))}
-              </div>
 
-              {/* Middle Section Layout */}
-              <div className="admin-middle-grid">
-                {/* Left panel: Traffic Map & List */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <div className="admin-panel">
-                    <div className="admin-panel-header">
-                      <span className="admin-panel-title">
-                        <Route size={16} style={{ color: 'var(--admin-accent-cyan)' }} /> City Traffic Simulation Overview
-                      </span>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="btn btn-ghost btn-sm" style={{ color: 'var(--admin-text-muted)', borderColor: 'var(--admin-border)' }}>
-                          <RefreshCw size={12} /> Sync SUMO
-                        </button>
+                  {/* Statistics Grid */}
+                  <div className="admin-stats-grid">
+                    {[
+                      { label: 'Total Intersections', value: `${intersections.length} Active`, icon: <Route size={18} />, color: 'var(--admin-accent-blue)', bg: 'rgba(59, 130, 246, 0.1)' },
+                      { label: 'Active Controllers', value: `${controllers.filter(c => c.status === 'Online').length} / ${controllers.length}`, icon: <Sliders size={18} />, color: 'var(--admin-accent-cyan)', bg: 'rgba(6, 182, 212, 0.1)' },
+                      { label: 'Active Vehicles', value: vehiclesCount, icon: <Activity size={18} />, color: 'var(--admin-accent-purple)', bg: 'rgba(168, 85, 247, 0.1)' },
+                      { label: 'Adaptive Signals', value: ruleAdaptive ? 'Enabled' : 'Disabled', icon: <ToggleLeft size={18} />, color: 'var(--admin-accent-green)', bg: 'rgba(16, 185, 129, 0.1)' },
+                      { label: 'System Health', value: '100% OK', icon: <Server size={18} />, color: 'var(--admin-accent-cyan)', bg: 'rgba(6, 182, 212, 0.1)' },
+                      { label: 'Traffic Efficiency', value: '+14.2%', icon: <Star size={18} />, color: 'var(--admin-accent-green)', bg: 'rgba(16, 185, 129, 0.1)' },
+                    ].map((stat, idx) => (
+                      <div key={idx} className="admin-stat-card">
+                        <div className="admin-stat-card-header">
+                          <span style={{ fontSize: '11px', color: 'var(--admin-text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{stat.label}</span>
+                          <div className="admin-stat-icon-box" style={{ background: stat.bg, color: stat.color }}>
+                            {stat.icon}
+                          </div>
+                        </div>
+                        <div className="admin-stat-card-value">{stat.value}</div>
                       </div>
-                    </div>
-                    {/* Simulated SUMO Environment */}
-                    <div style={{ height: '240px', background: '#09111e', border: '1px solid var(--admin-border)', borderRadius: '12px', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <div style={{ position: 'absolute', inset: 0, opacity: 0.1, backgroundImage: 'radial-gradient(var(--admin-accent-cyan) 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
-                      {/* Grid Roads */}
-                      <div style={{ position: 'absolute', height: '40px', left: 0, right: 0, background: '#122035', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 100px' }}>
-                        <div style={{ borderTop: '2px dashed var(--admin-text-muted)', width: '100%', height: '1px' }}></div>
-                      </div>
-                      <div style={{ position: 'absolute', width: '40px', top: 0, bottom: 0, background: '#122035', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', padding: '100px 0' }}>
-                        <div style={{ borderLeft: '2px dashed var(--admin-text-muted)', height: '100%', width: '1px' }}></div>
-                      </div>
-                      {/* Crossroad Junction Center */}
-                      <div style={{ position: 'absolute', width: '60px', height: '60px', background: '#1b2d49', border: '2px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)', boxShadow: '0 0 8px var(--success)' }}></div>
-                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--danger)', boxShadow: '0 0 8px var(--danger)' }}></div>
+                    ))}
+                  </div>
+
+                  {/* Middle Section Layout */}
+                  <div className="admin-middle-grid">
+                    {/* Left panel: Traffic Map & List */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      <div className="admin-panel">
+                        <div className="admin-panel-header">
+                          <span className="admin-panel-title">
+                            <Route size={16} style={{ color: 'var(--admin-accent-cyan)' }} /> City Traffic Simulation Overview
+                          </span>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button className="btn btn-ghost btn-sm" style={{ color: 'var(--admin-text-muted)', borderColor: 'var(--admin-border)' }} onClick={() => addToast('Re-syncing with SUMO environment port...', 'info')}>
+                              <RefreshCw size={12} /> Sync SUMO
+                            </button>
+                          </div>
+                        </div>
+                        {/* Simulated SUMO Environment */}
+                        <div style={{ height: '240px', background: '#09111e', border: '1px solid var(--admin-border)', borderRadius: '12px', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div style={{ position: 'absolute', inset: 0, opacity: 0.1, backgroundImage: 'radial-gradient(var(--admin-accent-cyan) 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+                          {/* Grid Roads */}
+                          <div style={{ position: 'absolute', height: '40px', left: 0, right: 0, background: '#122035', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 100px' }}>
+                            <div style={{ borderTop: '2px dashed var(--admin-text-muted)', width: '100%', height: '1px' }}></div>
+                          </div>
+                          <div style={{ position: 'absolute', width: '40px', top: 0, bottom: 0, background: '#122035', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', padding: '100px 0' }}>
+                            <div style={{ borderLeft: '2px dashed var(--admin-text-muted)', height: '100%', width: '1px' }}></div>
+                          </div>
+                          {/* Crossroad Junction Center */}
+                          <div style={{ position: 'absolute', width: '60px', height: '60px', background: '#1b2d49', border: '2px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)', boxShadow: '0 0 8px var(--success)' }}></div>
+                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--danger)', boxShadow: '0 0 8px var(--danger)' }}></div>
+                            </div>
+                          </div>
+                          {/* Interactive top-down vehicle icons */}
+                          <div style={{ position: 'absolute', left: '20%', top: '48%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '18px' }} title="Passenger Car">🚗</div>
+                          <div style={{ position: 'absolute', left: '35%', top: '45%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '18px' }} title="Bus">🚌</div>
+                          <div style={{ position: 'absolute', right: '25%', top: '48%', transform: 'translateY(-50%) rotate(180deg)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '18px' }} title="Truck">🚚</div>
+                          <div style={{ position: 'absolute', left: '46%', top: '15%', transform: 'translateX(-50%) rotate(90deg)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '18px' }} title="Ambulance">🚑</div>
+                          <span style={{ position: 'absolute', bottom: '12px', left: '16px', fontSize: '11px', color: 'var(--admin-text-muted)', fontFamily: 'var(--font-mono)' }}>SUMO Net Map Mode (2D Canvas View)</span>
                         </div>
                       </div>
-                      {/* Interactive top-down vehicle icons */}
-                      <div style={{ position: 'absolute', left: '20%', top: '48%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '18px' }} title="Passenger Car">🚗</div>
-                      <div style={{ position: 'absolute', left: '35%', top: '45%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '18px' }} title="Bus">🚌</div>
-                      <div style={{ position: 'absolute', right: '25%', top: '48%', transform: 'translateY(-50%) rotate(180deg)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '18px' }} title="Truck">🚚</div>
-                      <div style={{ position: 'absolute', left: '46%', top: '15%', transform: 'translateX(-50%) rotate(90deg)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '18px' }} title="Ambulance">🚑</div>
-                      <span style={{ position: 'absolute', bottom: '12px', left: '16px', fontSize: '11px', color: 'var(--admin-text-muted)', fontFamily: 'var(--font-mono)' }}>SUMO Net Map Mode (2D Canvas View)</span>
+
+                      <div className="admin-panel">
+                        <div className="admin-panel-header">
+                          <span className="admin-panel-title">
+                            <Sliders size={16} style={{ color: 'var(--admin-accent-cyan)' }} /> Active Intersection Status
+                          </span>
+                        </div>
+                        <div className="admin-table-container">
+                          <table className="admin-table">
+                            <thead>
+                              <tr>
+                                <th>Intersection Name</th>
+                                <th>Active Controller</th>
+                                <th>Flow Rate</th>
+                                <th>Wait Time</th>
+                                <th>Congestion Level</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {intersections.slice(0, 4).map((row, idx) => {
+                                const activeCtrl = controllers.find(c => c.assignedTo === row.id);
+                                return (
+                                  <tr key={idx}>
+                                    <td style={{ fontWeight: '600' }}>{row.name}</td>
+                                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '13px' }}>
+                                      {activeCtrl ? activeCtrl.id : 'None Assigned'}
+                                    </td>
+                                    <td>{row.vehicles * 3} veh/hr</td>
+                                    <td>{row.wait}s</td>
+                                    <td>
+                                      <span className={`semantic-badge ${row.congestion === 'Low' ? 'smooth' : row.congestion === 'Moderate' ? 'moderate' : 'congested'}`}>
+                                        {row.congestion}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right panel: Active alerts & Connections */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      <div className="admin-panel">
+                        <div className="admin-panel-header">
+                          <span className="admin-panel-title">
+                            <Activity size={16} style={{ color: 'var(--admin-accent-purple)' }} /> Connected Services
+                          </span>
+                        </div>
+                        <div className="service-indicator-grid">
+                          {[
+                            { name: 'Database', status: serviceStatus.database, label: 'PostgreSQL Active' },
+                            { name: 'Backend API', status: serviceStatus.backend, label: 'FastAPI REST' },
+                            { name: 'SUMO Sim', status: serviceStatus.sumo, label: 'TraCI Port 8813' },
+                            { name: 'WebSocket', status: serviceStatus.websocket, label: 'Live Server' },
+                          ].map((service, idx) => (
+                            <div key={idx} className="service-card">
+                              <div className={`service-status-dot ${service.status ? 'active' : 'inactive'}`}></div>
+                              <div className="service-details">
+                                <span className="service-name">{service.name}</span>
+                                <span className="service-status-label">{service.label}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="admin-panel">
+                        <div className="admin-panel-header">
+                          <span className="admin-panel-title">
+                            <AlertTriangle size={16} style={{ color: 'var(--danger)' }} /> Active Center Alerts
+                          </span>
+                        </div>
+                        <div className="dashboard-alert-list">
+                          {ruleAlerts.map(alert => (
+                            <div key={alert.id} className={`dashboard-alert-item ${alert.type === 'warning' ? 'warning' : 'critical'}`}>
+                              <div className="dashboard-alert-content">
+                                <span style={{ fontWeight: '600' }}>{alert.type === 'warning' ? 'Warning Alert' : 'Critical Event'}</span>
+                                <span>{alert.text}</span>
+                                <span className="dashboard-alert-time">{alert.time}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="admin-panel">
+                        <div className="admin-panel-header">
+                          <span className="admin-panel-title">
+                            <ToggleLeft size={16} style={{ color: 'var(--admin-accent-green)' }} /> Command Rule Engine
+                          </span>
+                        </div>
+                        <div className="rule-engine-widget">
+                          {[
+                            { label: 'Adaptive Signal Optimization', desc: 'Enable TraCI adaptive algorithm control', state: ruleAdaptive, setState: setRuleAdaptive },
+                            { label: 'Emergency Preemption Override', desc: 'Prioritize emergency responders', state: ruleEmergency, setState: setRuleEmergency },
+                            { label: 'High Congestion Alert Rules', desc: 'Notify operator of queues > 15 vehicles', state: ruleCongestion, setState: setRuleCongestion },
+                          ].map((rule, idx) => (
+                            <div key={idx} className="rule-toggle-row">
+                              <div className="rule-info">
+                                <span className="rule-name">{rule.label}</span>
+                                <span className="rule-desc">{rule.desc}</span>
+                              </div>
+                              <button 
+                                onClick={() => {
+                                  rule.setState(!rule.state);
+                                  addToast(`${rule.label} is now ${!rule.state ? 'Enabled' : 'Disabled'}`, 'info');
+                                }}
+                                className={`btn btn-sm ${rule.state ? 'btn-success' : 'btn-ghost'}`}
+                                style={{ padding: '6px 12px' }}
+                              >
+                                {rule.state ? 'ON' : 'OFF'}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Section Layout */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    <div className="admin-panel">
+                      <div className="admin-panel-header">
+                        <span className="admin-panel-title">
+                          <FileText size={16} style={{ color: 'var(--admin-accent-cyan)' }} /> Real-time Controller Log
+                        </span>
+                        <button 
+                          className="btn btn-ghost btn-sm"
+                          style={{ padding: '4px 8px', fontSize: '11px' }}
+                          onClick={() => {
+                            setControllerLogs(prev => [
+                              { time: new Date().toLocaleTimeString(), event: 'Manual logs sync completed successfully.' },
+                              ...prev
+                            ]);
+                            addToast('Controller logs synced', 'success');
+                          }}
+                        >
+                          Sync Log
+                        </button>
+                      </div>
+                      <div className="activity-log-list">
+                        {controllerLogs.map((log, idx) => (
+                          <div key={idx} className="activity-log-item">
+                            <span>{log.event}</span>
+                            <span className="activity-log-time">{log.time}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="admin-panel" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                      <div>
+                        <div className="admin-panel-header">
+                          <span className="admin-panel-title">
+                            <Settings size={16} style={{ color: 'var(--admin-accent-purple)' }} /> Quick Commands
+                          </span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+                          <button className="btn btn-outline" onClick={() => addToast('System diagnostic completed: 0 errors found.', 'success')}>
+                            Run Diagnostic
+                          </button>
+                          <button className="btn btn-outline" onClick={() => addToast('All database backup files compiled successfully.', 'success')}>
+                            Create DB Backup
+                          </button>
+                          <button className="btn btn-ghost" onClick={() => addToast('SUMO controller re-initialized.', 'info')}>
+                            Reload SUMO Config
+                          </button>
+                          <button className="btn btn-ghost" onClick={() => addToast('All notifications muted.', 'info')}>
+                            Clear Alert History
+                          </button>
+                        </div>
+                      </div>
+                      <div style={{ padding: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--admin-border)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: '700' }}>Automated DB Backups</div>
+                          <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)' }}>Last run: today, 12:00 PM (100% success)</div>
+                        </div>
+                        <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--admin-accent-green)' }}>AUTO-SYNC ON</span>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {activeTab === 'controllers' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} className="page-enter">
+                  <div className="admin-title-row">
+                    <h1 style={{ fontSize: '24px', fontWeight: '800', letterSpacing: '-0.02em' }}>
+                      Traffic Controllers Management
+                    </h1>
+                    <div className="admin-subtitle">
+                      Assign, manage, and configure TraCI signal hardware controllers to active road network nodes.
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
+                    {/* List of controllers */}
+                    <div className="admin-panel">
+                      <div className="admin-panel-header">
+                        <span className="admin-panel-title">
+                          <Sliders size={16} style={{ color: 'var(--admin-accent-cyan)' }} /> Active Signal Controllers
+                        </span>
+                      </div>
+                      <div className="admin-table-container">
+                        <table className="admin-table">
+                          <thead>
+                            <tr>
+                              <th>Controller ID</th>
+                              <th>Model Name</th>
+                              <th>Control Mode</th>
+                              <th>Connection Status</th>
+                              <th>Assigned Junction</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {controllers.map((ctrl, idx) => {
+                              const assignedIntersection = intersections.find(i => i.id === ctrl.assignedTo);
+                              return (
+                                <tr key={idx}>
+                                  <td style={{ fontWeight: '700', fontFamily: 'var(--font-mono)' }}>{ctrl.id}</td>
+                                  <td>{ctrl.name}</td>
+                                  <td>{ctrl.type}</td>
+                                  <td>
+                                    <span className={`semantic-badge ${ctrl.status === 'Online' ? 'smooth' : 'congested'}`}>
+                                      {ctrl.status}
+                                    </span>
+                                  </td>
+                                  <td style={{ fontWeight: '600', color: assignedIntersection ? 'var(--admin-accent-cyan)' : 'var(--admin-text-muted)' }}>
+                                    {assignedIntersection ? assignedIntersection.name : 'Unassigned'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Controller Assignment Form */}
+                    <div className="admin-panel" style={{ height: 'fit-content' }}>
+                      <div className="admin-panel-header">
+                        <span className="admin-panel-title">
+                          <ToggleLeft size={16} style={{ color: 'var(--admin-accent-purple)' }} /> Assign Controller
+                        </span>
+                      </div>
+                      <form onSubmit={handleAssignController} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div className="form-group">
+                          <label className="form-label" style={{ color: 'var(--admin-text-muted)' }}>Select Controller</label>
+                          <select 
+                            className="form-control" 
+                            style={{ background: '#09111e', border: '1px solid var(--admin-border)', color: 'white' }}
+                            value={selectedControllerId}
+                            onChange={(e) => setSelectedControllerId(e.target.value)}
+                            required
+                          >
+                            <option value="">-- Choose Controller --</option>
+                            {controllers.map(c => (
+                              <option key={c.id} value={c.id}>
+                                {c.id} - {c.name.split(' (')[0]} {c.assignedTo ? `(Assigned)` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label" style={{ color: 'var(--admin-text-muted)' }}>Select Intersection</label>
+                          <select 
+                            className="form-control" 
+                            style={{ background: '#09111e', border: '1px solid var(--admin-border)', color: 'white' }}
+                            value={selectedIntersectionId}
+                            onChange={(e) => setSelectedIntersectionId(e.target.value)}
+                            required
+                          >
+                            <option value="">-- Choose Intersection --</option>
+                            {intersections.map(i => {
+                              const currentAssigned = controllers.find(c => c.assignedTo === i.id);
+                              return (
+                                <option key={i.id} value={i.id}>
+                                  {i.name} {currentAssigned ? `(Currently: ${currentAssigned.id})` : ''}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+
+                        <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+                          Update Assignment
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'intersections' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} className="page-enter">
+                  <div className="admin-title-row">
+                    <h1 style={{ fontSize: '24px', fontWeight: '800', letterSpacing: '-0.02em' }}>
+                      Intersection Management
+                    </h1>
+                    <div className="admin-subtitle">
+                      Monitor vehicle throughput, congestion, waiting delay queues, and control algorithms.
                     </div>
                   </div>
 
                   <div className="admin-panel">
                     <div className="admin-panel-header">
                       <span className="admin-panel-title">
-                        <Sliders size={16} style={{ color: 'var(--admin-accent-cyan)' }} /> Active Intersection Status
+                        <Route size={16} style={{ color: 'var(--admin-accent-cyan)' }} /> Active Intersections
                       </span>
                     </div>
                     <div className="admin-table-container">
                       <table className="admin-table">
                         <thead>
                           <tr>
-                            <th>Intersection Name</th>
-                            <th>Signal Mode</th>
-                            <th>Flow Rate</th>
-                            <th>Wait Time</th>
-                            <th>Congestion Level</th>
+                            <th>Junction Name</th>
+                            <th>Active Controller</th>
+                            <th>Vehicles Staged</th>
+                            <th>Avg Delay</th>
+                            <th>Load Level</th>
+                            <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {[
-                            { name: 'Main St & 1st Ave', mode: 'Adaptive Controller', flow: '45 veh/min', wait: '18s', status: 'smooth', label: 'Smooth' },
-                            { name: 'Park Rd & Central', mode: 'Adaptive Controller', flow: '82 veh/min', wait: '85s', status: 'heavy', label: 'Heavy' },
-                            { name: 'Harbor Blvd & 5th', mode: 'Emergency Preempt', flow: '61 veh/min', wait: '42s', status: 'moderate', label: 'Moderate' },
-                            { name: 'Airport Rd & Ring Rd', mode: 'Manual Override', flow: '94 veh/min', wait: '120s', status: 'congested', label: 'Congested' },
-                          ].map((row, idx) => (
-                            <tr key={idx}>
-                              <td style={{ fontWeight: '600' }}>{row.name}</td>
-                              <td style={{ fontFamily: 'var(--font-mono)', fontSize: '13px' }}>{row.mode}</td>
-                              <td>{row.flow}</td>
-                              <td>{row.wait}</td>
-                              <td>
-                                <span className={`semantic-badge ${row.status}`}>{row.label}</span>
-                              </td>
-                            </tr>
-                          ))}
+                          {intersections.map((row, idx) => {
+                            const activeCtrl = controllers.find(c => c.assignedTo === row.id);
+                            return (
+                              <tr key={idx}>
+                                <td style={{ fontWeight: '600' }}>{row.name}</td>
+                                <td style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: '700', color: activeCtrl ? 'var(--admin-accent-cyan)' : 'var(--admin-text-muted)' }}>
+                                  {activeCtrl ? activeCtrl.id : 'No Controller'}
+                                </td>
+                                <td>{row.vehicles} vehicles</td>
+                                <td>{row.wait}s</td>
+                                <td>
+                                  <span className={`semantic-badge ${row.congestion === 'Low' ? 'smooth' : row.congestion === 'Moderate' ? 'moderate' : 'congested'}`}>
+                                    {row.congestion}
+                                  </span>
+                                </td>
+                                <td>
+                                  <button 
+                                    className="btn btn-ghost btn-sm" 
+                                    style={{ borderColor: 'var(--admin-border)', color: 'var(--admin-accent-blue)' }}
+                                    onClick={() => {
+                                      setActiveTab('controllers');
+                                      setSelectedIntersectionId(row.id.toString());
+                                      if (activeCtrl) setSelectedControllerId(activeCtrl.id);
+                                    }}
+                                  >
+                                    Configure Controller
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
                   </div>
                 </div>
+              )}
 
-                {/* Right panel: Active alerts & Connections */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <div className="admin-panel">
-                    <div className="admin-panel-header">
-                      <span className="admin-panel-title">
-                        <Activity size={16} style={{ color: 'var(--admin-accent-purple)' }} /> Connected Services
-                      </span>
-                    </div>
-                    <div className="service-indicator-grid">
-                      {[
-                        { name: 'Database', status: serviceStatus.database, label: 'PostgreSQL Active' },
-                        { name: 'Backend API', status: serviceStatus.backend, label: 'FastAPI REST' },
-                        { name: 'SUMO Sim', status: serviceStatus.sumo, label: 'TraCI Port 8813' },
-                        { name: 'WebSocket', status: serviceStatus.websocket, label: 'Live Server' },
-                      ].map((service, idx) => (
-                        <div key={idx} className="service-card">
-                          <div className={`service-status-dot ${service.status ? 'active' : 'inactive'}`}></div>
-                          <div className="service-details">
-                            <span className="service-name">{service.name}</span>
-                            <span className="service-status-label">{service.label}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="admin-panel">
-                    <div className="admin-panel-header">
-                      <span className="admin-panel-title">
-                        <AlertTriangle size={16} style={{ color: 'var(--danger)' }} /> Active Center Alerts
-                      </span>
-                    </div>
-                    <div className="dashboard-alert-list">
-                      {ruleAlerts.map(alert => (
-                        <div key={alert.id} className={`dashboard-alert-item ${alert.type === 'warning' ? 'warning' : 'critical'}`}>
-                          <div className="dashboard-alert-content">
-                            <span style={{ fontWeight: '600' }}>{alert.type === 'warning' ? 'Warning Alert' : 'Critical Event'}</span>
-                            <span>{alert.text}</span>
-                            <span className="dashboard-alert-time">{alert.time}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="admin-panel">
-                    <div className="admin-panel-header">
-                      <span className="admin-panel-title">
-                        <ToggleLeft size={16} style={{ color: 'var(--admin-accent-green)' }} /> Command Rule Engine
-                      </span>
-                    </div>
-                    <div className="rule-engine-widget">
-                      {[
-                        { label: 'Adaptive Signal Optimization', desc: 'Enable TraCI adaptive algorithm control', state: ruleAdaptive, setState: setRuleAdaptive },
-                        { label: 'Emergency Preemption Override', desc: 'Prioritize emergency responders', state: ruleEmergency, setState: setRuleEmergency },
-                        { label: 'High Congestion Alert Rules', desc: 'Notify operator of queues > 15 vehicles', state: ruleCongestion, setState: setRuleCongestion },
-                      ].map((rule, idx) => (
-                        <div key={idx} className="rule-toggle-row">
-                          <div className="rule-info">
-                            <span className="rule-name">{rule.label}</span>
-                            <span className="rule-desc">{rule.desc}</span>
-                          </div>
-                          <button 
-                            onClick={() => {
-                              rule.setState(!rule.state);
-                              addToast(`${rule.label} is now ${!rule.state ? 'Enabled' : 'Disabled'}`, 'info');
-                            }}
-                            className={`btn btn-sm ${rule.state ? 'btn-success' : 'btn-ghost'}`}
-                            style={{ padding: '6px 12px' }}
-                          >
-                            {rule.state ? 'ON' : 'OFF'}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+              {['users', 'reports', 'rule_engine', 'monitoring', 'settings'].includes(activeTab) && (
+                <div style={{ padding: '40px', textAlign: 'center' }} className="admin-panel page-enter">
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚙️</div>
+                  <h2 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--admin-text-main)' }}>
+                    {activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace('_', ' ')} Settings
+                  </h2>
+                  <p style={{ color: 'var(--admin-text-muted)', fontSize: '14px', marginTop: '8px', maxWidth: '380px', margin: '8px auto' }}>
+                    Configuration parameters for this ITS submodule are loaded in local sandbox mode. Complete custom rules setup in SUMO rules.
+                  </p>
+                  <button className="btn btn-ghost btn-sm" style={{ marginTop: '16px', borderColor: 'var(--admin-border)' }} onClick={() => setActiveTab('dashboard')}>
+                    Return to Dashboard Home
+                  </button>
                 </div>
-              </div>
-
-              {/* Bottom Section Layout */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                <div className="admin-panel">
-                  <div className="admin-panel-header">
-                    <span className="admin-panel-title">
-                      <FileText size={16} style={{ color: 'var(--admin-accent-cyan)' }} /> Real-time Controller Log
-                    </span>
-                    <button 
-                      className="btn btn-ghost btn-sm"
-                      style={{ padding: '4px 8px', fontSize: '11px' }}
-                      onClick={() => {
-                        setControllerLogs(prev => [
-                          { time: new Date().toLocaleTimeString(), event: 'Manual logs sync completed successfully.' },
-                          ...prev
-                        ]);
-                        addToast('Controller logs synced', 'success');
-                      }}
-                    >
-                      Sync Log
-                    </button>
-                  </div>
-                  <div className="activity-log-list">
-                    {controllerLogs.map((log, idx) => (
-                      <div key={idx} className="activity-log-item">
-                        <span>{log.event}</span>
-                        <span className="activity-log-time">{log.time}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="admin-panel" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div>
-                    <div className="admin-panel-header">
-                      <span className="admin-panel-title">
-                        <Settings size={16} style={{ color: 'var(--admin-accent-purple)' }} /> Quick Commands
-                      </span>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
-                      <button className="btn btn-outline" onClick={() => addToast('System diagnostic completed: 0 errors found.', 'success')}>
-                        Run Diagnostic
-                      </button>
-                      <button className="btn btn-outline" onClick={() => addToast('All database backup files compiled successfully.', 'success')}>
-                        Create DB Backup
-                      </button>
-                      <button className="btn btn-ghost" onClick={() => addToast('SUMO controller re-initialized.', 'info')}>
-                        Reload SUMO Config
-                      </button>
-                      <button className="btn btn-ghost" onClick={() => addToast('All notifications muted.', 'info')}>
-                        Clear Alert History
-                      </button>
-                    </div>
-                  </div>
-                  <div style={{ padding: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--admin-border)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontSize: '13px', fontWeight: '700' }}>Automated DB Backups</div>
-                      <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)' }}>Last run: today, 12:00 PM (100% success)</div>
-                    </div>
-                    <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--admin-accent-green)' }}>AUTO-SYNC ON</span>
-                  </div>
-                </div>
-              </div>
+              )}
             </main>
           </div>
         </div>
