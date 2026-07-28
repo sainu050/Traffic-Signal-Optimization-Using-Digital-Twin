@@ -3,7 +3,10 @@ import {
   TrafficCone, Rocket, LogIn, Eye, EyeOff, User, 
   UserCheck, Shield, Mail, Lock, Phone, MapPin, 
   AlertTriangle, Star, CheckCircle, Info, Menu, 
-  Satellite, Bell, BarChart3, Users, Route, Activity 
+  Satellite, Bell, BarChart3, Users, Route, Activity,
+  LayoutDashboard, Sliders, ToggleLeft, Layers, Settings,
+  Search, FileText, Database, Server, HardDrive, Play,
+  Pause, RefreshCw, Power
 } from 'lucide-react';
 import './App.css';
 
@@ -45,6 +48,31 @@ export default function App() {
   const [pwdStrength, setPwdStrength] = useState({ score: 0, text: '', class: '' });
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [showRegConfirm, setShowRegConfirm] = useState(false);
+
+  // Admin Dashboard States
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [ruleAdaptive, setRuleAdaptive] = useState(true);
+  const [ruleEmergency, setRuleEmergency] = useState(true);
+  const [ruleCongestion, setRuleCongestion] = useState(false);
+  const [serviceStatus, setServiceStatus] = useState({
+    database: true,
+    backend: true,
+    sumo: true,
+    websocket: true
+  });
+  const [ruleAlerts, setRuleAlerts] = useState([
+    { id: 1, type: 'critical', text: 'Intersection Main St & 1st Ave: Wait time exceeded 120s', time: '19:40:12' },
+    { id: 2, type: 'warning', text: 'SUMO Simulator latency spike: 230ms response threshold reached', time: '19:35:45' },
+    { id: 3, type: 'critical', text: 'Controller Park Rd & Central offline. Initiating backup sequence', time: '19:12:03' }
+  ]);
+  const [controllerLogs, setControllerLogs] = useState([
+    { time: '19:42:15', event: 'Applied Adaptive Green timing recommending 45s (Main St)' },
+    { time: '19:40:02', event: 'Priority Preemption triggered: Emergency vehicle detected (Harbor Blvd)' },
+    { time: '19:38:44', event: 'Database connection pools optimized (Active sessions: 14)' },
+    { time: '19:35:10', event: 'SUMO simulation step sync complete (Step: 45000)' },
+    { time: '19:30:00', event: 'Automated health audit: All nodes check passed (Uptime: 45h)' }
+  ]);
 
   // Simulation State
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
@@ -117,9 +145,12 @@ export default function App() {
       const match = demoUsers.find(u => u.email === loginEmail && u.password === loginPassword);
       if (match) {
         addToast(`Success! Welcome, ${match.name}.`, 'success');
-        // Clear login page details & redirect to Landing for Demo flow
         setTimeout(() => {
-          setCurrentPage('landing');
+          if (match.role === 'admin') {
+            setCurrentPage('admin_dashboard');
+          } else {
+            setCurrentPage('landing');
+          }
         }, 1000);
       } else {
         addToast('Invalid credentials. Please try demo settings.', 'error');
@@ -768,6 +799,358 @@ export default function App() {
                 </span>
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {currentPage === 'admin_dashboard' && (
+        <div className="admin-theme page-enter">
+          {/* Collapsible Left Navigation */}
+          <aside className={`admin-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
+            <div className="admin-sidebar-header">
+              <div className="admin-sidebar-logo">
+                <div className="logo-icon">
+                  <TrafficCone size={18} />
+                </div>
+                <span className="logo-text" style={{ color: 'var(--admin-text-main)' }}>Urban<span style={{ color: 'var(--admin-accent-cyan)' }}>Flow</span></span>
+              </div>
+              <button 
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                style={{ background: 'none', border: 'none', color: 'var(--admin-text-muted)', cursor: 'pointer' }}
+                title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+              >
+                <Menu size={18} />
+              </button>
+            </div>
+
+            <nav className="admin-menu-list">
+              {[
+                { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+                { id: 'intersections', label: 'Intersection Management', icon: <Route size={18} /> },
+                { id: 'controllers', label: 'Traffic Controllers', icon: <Sliders size={18} /> },
+                { id: 'users', label: 'Users', icon: <Users size={18} /> },
+                { id: 'reports', label: 'Reports', icon: <FileText size={18} /> },
+                { id: 'rule_engine', label: 'Rule Engine', icon: <ToggleLeft size={18} /> },
+                { id: 'monitoring', label: 'System Monitoring', icon: <Activity size={18} /> },
+                { id: 'settings', label: 'Settings', icon: <Settings size={18} /> },
+              ].map(item => (
+                <button
+                  key={item.id}
+                  className={`admin-menu-item ${activeTab === item.id ? 'active' : ''}`}
+                  onClick={() => setActiveTab(item.id)}
+                >
+                  {item.icon}
+                  <span className="admin-menu-text">{item.label}</span>
+                </button>
+              ))}
+            </nav>
+
+            <div className="admin-sidebar-footer">
+              <button 
+                className="btn btn-ghost btn-sm" 
+                style={{ width: '100%', borderColor: 'rgba(255,255,255,0.1)', color: 'var(--admin-text-muted)' }}
+                onClick={() => {
+                  addToast('Signing out...', 'info');
+                  setTimeout(() => {
+                    setCurrentPage('landing');
+                    setActiveTab('dashboard');
+                  }, 800);
+                }}
+              >
+                <Power size={14} />
+                <span className="admin-menu-text">Sign Out</span>
+              </button>
+            </div>
+          </aside>
+
+          {/* Main Layout Area */}
+          <div className="admin-layout-main">
+            {/* Topbar */}
+            <header className="admin-topbar">
+              <div>
+                <h2 style={{ fontSize: '15px', fontWeight: '700', letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--admin-text-main)' }}>
+                  Intelligent Transportation System (ITS) Command Centre
+                </h2>
+              </div>
+              <div className="admin-topbar-actions">
+                <div className="admin-search-wrapper">
+                  <Search className="icon" size={16} />
+                  <input className="admin-search-input" type="text" placeholder="Global system search..." />
+                </div>
+
+                <button style={{ background: 'none', border: 'none', color: 'var(--admin-text-muted)', cursor: 'pointer', position: 'relative' }}>
+                  <Bell size={18} />
+                  <span style={{ position: 'absolute', top: '-4px', right: '-4px', width: '6px', height: '6px', backgroundColor: 'var(--danger)', borderRadius: '50%' }}></span>
+                </button>
+
+                <div style={{ height: '20px', width: '1px', backgroundColor: 'var(--admin-border)' }}></div>
+
+                <div className="admin-profile-btn">
+                  <div className="admin-profile-avatar">RP</div>
+                  <div style={{ textAlign: 'left' }} className="admin-menu-text">
+                    <div style={{ fontSize: '13px', fontWeight: '600' }}>Dr. Raj Patel</div>
+                    <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)' }}>System Administrator</div>
+                  </div>
+                </div>
+              </div>
+            </header>
+
+            {/* Dashboard Contents */}
+            <main className="admin-content-area">
+              <div className="admin-title-row">
+                <h1 style={{ fontSize: '24px', fontWeight: '800', letterSpacing: '-0.02em' }}>
+                  ITS Dashboard Control Panel
+                </h1>
+                <div className="admin-subtitle">
+                  Real-time status overview of active nodes and adaptive signal controllers.
+                </div>
+              </div>
+
+              {/* Statistics Grid */}
+              <div className="admin-stats-grid">
+                {[
+                  { label: 'Total Intersections', value: '12 Active', icon: <Route size={18} />, color: 'var(--admin-accent-blue)', bg: 'rgba(59, 130, 246, 0.1)' },
+                  { label: 'Active Controllers', value: '12 / 12', icon: <Sliders size={18} />, color: 'var(--admin-accent-cyan)', bg: 'rgba(6, 182, 212, 0.1)' },
+                  { label: 'Active Vehicles', value: vehiclesCount, icon: <Activity size={18} />, color: 'var(--admin-accent-purple)', bg: 'rgba(168, 85, 247, 0.1)' },
+                  { label: 'Adaptive Signals', value: ruleAdaptive ? 'Enabled' : 'Disabled', icon: <ToggleLeft size={18} />, color: 'var(--admin-accent-green)', bg: 'rgba(16, 185, 129, 0.1)' },
+                  { label: 'System Health', value: '100% OK', icon: <Server size={18} />, color: 'var(--admin-accent-cyan)', bg: 'rgba(6, 182, 212, 0.1)' },
+                  { label: 'Traffic Efficiency', value: '+14.2%', icon: <Star size={18} />, color: 'var(--admin-accent-green)', bg: 'rgba(16, 185, 129, 0.1)' },
+                ].map((stat, idx) => (
+                  <div key={idx} className="admin-stat-card">
+                    <div className="admin-stat-card-header">
+                      <span style={{ fontSize: '11px', color: 'var(--admin-text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{stat.label}</span>
+                      <div className="admin-stat-icon-box" style={{ background: stat.bg, color: stat.color }}>
+                        {stat.icon}
+                      </div>
+                    </div>
+                    <div className="admin-stat-card-value">{stat.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Middle Section Layout */}
+              <div className="admin-middle-grid">
+                {/* Left panel: Traffic Map & List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div className="admin-panel">
+                    <div className="admin-panel-header">
+                      <span className="admin-panel-title">
+                        <Route size={16} style={{ color: 'var(--admin-accent-cyan)' }} /> City Traffic Simulation Overview
+                      </span>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button className="btn btn-ghost btn-sm" style={{ color: 'var(--admin-text-muted)', borderColor: 'var(--admin-border)' }}>
+                          <RefreshCw size={12} /> Sync SUMO
+                        </button>
+                      </div>
+                    </div>
+                    {/* Simulated SUMO Environment */}
+                    <div style={{ height: '240px', background: '#09111e', border: '1px solid var(--admin-border)', borderRadius: '12px', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ position: 'absolute', inset: 0, opacity: 0.1, backgroundImage: 'radial-gradient(var(--admin-accent-cyan) 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+                      {/* Grid Roads */}
+                      <div style={{ position: 'absolute', height: '40px', left: 0, right: 0, background: '#122035', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 100px' }}>
+                        <div style={{ borderTop: '2px dashed var(--admin-text-muted)', width: '100%', height: '1px' }}></div>
+                      </div>
+                      <div style={{ position: 'absolute', width: '40px', top: 0, bottom: 0, background: '#122035', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', padding: '100px 0' }}>
+                        <div style={{ borderLeft: '2px dashed var(--admin-text-muted)', height: '100%', width: '1px' }}></div>
+                      </div>
+                      {/* Crossroad Junction Center */}
+                      <div style={{ position: 'absolute', width: '60px', height: '60px', background: '#1b2d49', border: '2px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)', boxShadow: '0 0 8px var(--success)' }}></div>
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--danger)', boxShadow: '0 0 8px var(--danger)' }}></div>
+                        </div>
+                      </div>
+                      {/* Interactive top-down vehicle icons */}
+                      <div style={{ position: 'absolute', left: '20%', top: '48%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '18px' }} title="Passenger Car">🚗</div>
+                      <div style={{ position: 'absolute', left: '35%', top: '45%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '18px' }} title="Bus">🚌</div>
+                      <div style={{ position: 'absolute', right: '25%', top: '48%', transform: 'translateY(-50%) rotate(180deg)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '18px' }} title="Truck">🚚</div>
+                      <div style={{ position: 'absolute', left: '46%', top: '15%', transform: 'translateX(-50%) rotate(90deg)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '18px' }} title="Ambulance">🚑</div>
+                      <span style={{ position: 'absolute', bottom: '12px', left: '16px', fontSize: '11px', color: 'var(--admin-text-muted)', fontFamily: 'var(--font-mono)' }}>SUMO Net Map Mode (2D Canvas View)</span>
+                    </div>
+                  </div>
+
+                  <div className="admin-panel">
+                    <div className="admin-panel-header">
+                      <span className="admin-panel-title">
+                        <Sliders size={16} style={{ color: 'var(--admin-accent-cyan)' }} /> Active Intersection Status
+                      </span>
+                    </div>
+                    <div className="admin-table-container">
+                      <table className="admin-table">
+                        <thead>
+                          <tr>
+                            <th>Intersection Name</th>
+                            <th>Signal Mode</th>
+                            <th>Flow Rate</th>
+                            <th>Wait Time</th>
+                            <th>Congestion Level</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[
+                            { name: 'Main St & 1st Ave', mode: 'Adaptive Controller', flow: '45 veh/min', wait: '18s', status: 'smooth', label: 'Smooth' },
+                            { name: 'Park Rd & Central', mode: 'Adaptive Controller', flow: '82 veh/min', wait: '85s', status: 'heavy', label: 'Heavy' },
+                            { name: 'Harbor Blvd & 5th', mode: 'Emergency Preempt', flow: '61 veh/min', wait: '42s', status: 'moderate', label: 'Moderate' },
+                            { name: 'Airport Rd & Ring Rd', mode: 'Manual Override', flow: '94 veh/min', wait: '120s', status: 'congested', label: 'Congested' },
+                          ].map((row, idx) => (
+                            <tr key={idx}>
+                              <td style={{ fontWeight: '600' }}>{row.name}</td>
+                              <td style={{ fontFamily: 'var(--font-mono)', fontSize: '13px' }}>{row.mode}</td>
+                              <td>{row.flow}</td>
+                              <td>{row.wait}</td>
+                              <td>
+                                <span className={`semantic-badge ${row.status}`}>{row.label}</span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right panel: Active alerts & Connections */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div className="admin-panel">
+                    <div className="admin-panel-header">
+                      <span className="admin-panel-title">
+                        <Activity size={16} style={{ color: 'var(--admin-accent-purple)' }} /> Connected Services
+                      </span>
+                    </div>
+                    <div className="service-indicator-grid">
+                      {[
+                        { name: 'Database', status: serviceStatus.database, label: 'PostgreSQL Active' },
+                        { name: 'Backend API', status: serviceStatus.backend, label: 'FastAPI REST' },
+                        { name: 'SUMO Sim', status: serviceStatus.sumo, label: 'TraCI Port 8813' },
+                        { name: 'WebSocket', status: serviceStatus.websocket, label: 'Live Server' },
+                      ].map((service, idx) => (
+                        <div key={idx} className="service-card">
+                          <div className={`service-status-dot ${service.status ? 'active' : 'inactive'}`}></div>
+                          <div className="service-details">
+                            <span className="service-name">{service.name}</span>
+                            <span className="service-status-label">{service.label}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="admin-panel">
+                    <div className="admin-panel-header">
+                      <span className="admin-panel-title">
+                        <AlertTriangle size={16} style={{ color: 'var(--danger)' }} /> Active Center Alerts
+                      </span>
+                    </div>
+                    <div className="dashboard-alert-list">
+                      {ruleAlerts.map(alert => (
+                        <div key={alert.id} className={`dashboard-alert-item ${alert.type === 'warning' ? 'warning' : 'critical'}`}>
+                          <div className="dashboard-alert-content">
+                            <span style={{ fontWeight: '600' }}>{alert.type === 'warning' ? 'Warning Alert' : 'Critical Event'}</span>
+                            <span>{alert.text}</span>
+                            <span className="dashboard-alert-time">{alert.time}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="admin-panel">
+                    <div className="admin-panel-header">
+                      <span className="admin-panel-title">
+                        <ToggleLeft size={16} style={{ color: 'var(--admin-accent-green)' }} /> Command Rule Engine
+                      </span>
+                    </div>
+                    <div className="rule-engine-widget">
+                      {[
+                        { label: 'Adaptive Signal Optimization', desc: 'Enable TraCI adaptive algorithm control', state: ruleAdaptive, setState: setRuleAdaptive },
+                        { label: 'Emergency Preemption Override', desc: 'Prioritize emergency responders', state: ruleEmergency, setState: setRuleEmergency },
+                        { label: 'High Congestion Alert Rules', desc: 'Notify operator of queues > 15 vehicles', state: ruleCongestion, setState: setRuleCongestion },
+                      ].map((rule, idx) => (
+                        <div key={idx} className="rule-toggle-row">
+                          <div className="rule-info">
+                            <span className="rule-name">{rule.label}</span>
+                            <span className="rule-desc">{rule.desc}</span>
+                          </div>
+                          <button 
+                            onClick={() => {
+                              rule.setState(!rule.state);
+                              addToast(`${rule.label} is now ${!rule.state ? 'Enabled' : 'Disabled'}`, 'info');
+                            }}
+                            className={`btn btn-sm ${rule.state ? 'btn-success' : 'btn-ghost'}`}
+                            style={{ padding: '6px 12px' }}
+                          >
+                            {rule.state ? 'ON' : 'OFF'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Section Layout */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div className="admin-panel">
+                  <div className="admin-panel-header">
+                    <span className="admin-panel-title">
+                      <FileText size={16} style={{ color: 'var(--admin-accent-cyan)' }} /> Real-time Controller Log
+                    </span>
+                    <button 
+                      className="btn btn-ghost btn-sm"
+                      style={{ padding: '4px 8px', fontSize: '11px' }}
+                      onClick={() => {
+                        setControllerLogs(prev => [
+                          { time: new Date().toLocaleTimeString(), event: 'Manual logs sync completed successfully.' },
+                          ...prev
+                        ]);
+                        addToast('Controller logs synced', 'success');
+                      }}
+                    >
+                      Sync Log
+                    </button>
+                  </div>
+                  <div className="activity-log-list">
+                    {controllerLogs.map((log, idx) => (
+                      <div key={idx} className="activity-log-item">
+                        <span>{log.event}</span>
+                        <span className="activity-log-time">{log.time}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="admin-panel" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div className="admin-panel-header">
+                      <span className="admin-panel-title">
+                        <Settings size={16} style={{ color: 'var(--admin-accent-purple)' }} /> Quick Commands
+                      </span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+                      <button className="btn btn-outline" onClick={() => addToast('System diagnostic completed: 0 errors found.', 'success')}>
+                        Run Diagnostic
+                      </button>
+                      <button className="btn btn-outline" onClick={() => addToast('All database backup files compiled successfully.', 'success')}>
+                        Create DB Backup
+                      </button>
+                      <button className="btn btn-ghost" onClick={() => addToast('SUMO controller re-initialized.', 'info')}>
+                        Reload SUMO Config
+                      </button>
+                      <button className="btn btn-ghost" onClick={() => addToast('All notifications muted.', 'info')}>
+                        Clear Alert History
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ padding: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--admin-border)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: '700' }}>Automated DB Backups</div>
+                      <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)' }}>Last run: today, 12:00 PM (100% success)</div>
+                    </div>
+                    <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--admin-accent-green)' }}>AUTO-SYNC ON</span>
+                  </div>
+                </div>
+              </div>
+            </main>
           </div>
         </div>
       )}
