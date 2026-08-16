@@ -26,13 +26,24 @@ const initialIntersections = [
 
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState('landing'); // 'landing', 'login', 'register'
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem('currentUser');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [currentPage, setCurrentPage] = useState(() => {
+    const saved = localStorage.getItem('currentUser');
+    if (saved) {
+      const user = JSON.parse(saved);
+      if (user.role === 'admin') return 'admin_dashboard';
+      if (user.role === 'public' || user.role === 'operator') return 'public_dashboard';
+    }
+    return 'landing';
+  });
   const [loginRole, setLoginRole] = useState('public');
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [toasts, setToasts] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
   
   // Registration States
   const [regFName, setRegFName] = useState('');
@@ -47,6 +58,11 @@ export default function App() {
   const [pwdStrength, setPwdStrength] = useState({ score: 0, text: '', class: '' });
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [showRegConfirm, setShowRegConfirm] = useState(false);
+
+  // First Login Reset Password States
+  const [firstLoginCurrentPwd, setFirstLoginCurrentPwd] = useState('');
+  const [firstLoginNewPwd, setFirstLoginNewPwd] = useState('');
+  const [firstLoginConfirmPwd, setFirstLoginConfirmPwd] = useState('');
 
   // Admin Dashboard States
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -169,6 +185,7 @@ export default function App() {
 
       if (response.ok && data.success) {
         addToast(`Success! Welcome, ${data.user.name}.`, 'success');
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
         setCurrentUser(data.user);
         setTimeout(() => {
           if (data.user.role === 'admin') {
@@ -185,6 +202,43 @@ export default function App() {
     } catch (error) {
       addToast('Cannot connect to server. Please ensure the backend is running.', 'error');
     }
+  };
+
+  const handleFirstLoginPasswordReset = (e) => {
+    e.preventDefault();
+    if (firstLoginNewPwd !== firstLoginConfirmPwd) {
+      addToast('New passwords do not match.', 'error');
+      return;
+    }
+    if (firstLoginNewPwd.length < 6) {
+      addToast('Password must be at least 6 characters.', 'error');
+      return;
+    }
+
+    fetch('http://localhost:8000/api/users/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: currentUser.email,
+        current_password: firstLoginCurrentPwd,
+        new_password: firstLoginNewPwd
+      })
+    }).then(res => {
+      if (res.ok) {
+        return res.json();
+      }
+      return res.json().then(data => { throw new Error(data.detail || 'Failed to change password.'); });
+    }).then(() => {
+      addToast('Password updated successfully! Welcome to UrbanFlow.', 'success');
+      const updatedUser = { ...currentUser, is_first_login: false };
+      setCurrentUser(updatedUser);
+      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      setFirstLoginCurrentPwd('');
+      setFirstLoginNewPwd('');
+      setFirstLoginConfirmPwd('');
+    }).catch(err => {
+      addToast(err.message || 'Error updating password.', 'error');
+    });
   };
 
   const handleAssignController = (e) => {
@@ -625,6 +679,8 @@ export default function App() {
                 onClick={() => {
                   addToast('Signing out...', 'info');
                   setTimeout(() => {
+                    localStorage.removeItem('currentUser');
+                    setCurrentUser(null);
                     setCurrentPage('landing');
                     setPublicActiveTab('dashboard');
                   }, 800);
@@ -979,6 +1035,75 @@ export default function App() {
                 </div>
               )}
             </main>
+          </div>
+        </div>
+      )}
+
+      {/* Forced Password Reset Modal for First Login */}
+      {currentUser && currentUser.is_first_login && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.95)',
+          zIndex: 9999,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          backdropFilter: 'blur(8px)',
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#1e293b',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '440px',
+            padding: '32px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.5)',
+            color: 'white'
+          }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 800, margin: '0 0 10px', color: '#38bdf8' }}>First-Time Login Security Setup</h2>
+            <p style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '24px', lineHeight: '1.5' }}>
+              Welcome to UrbanFlow! For security purposes, you are required to change your temporary password before accessing the system.
+            </p>
+            <form onSubmit={handleFirstLoginPasswordReset} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.5)', marginBottom: '6px' }}>Temporary Password</label>
+                <input 
+                  type="password" 
+                  value={firstLoginCurrentPwd} 
+                  onChange={(e) => setFirstLoginCurrentPwd(e.target.value)} 
+                  style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: 'white' }}
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.5)', marginBottom: '6px' }}>New Password</label>
+                <input 
+                  type="password" 
+                  value={firstLoginNewPwd} 
+                  onChange={(e) => setFirstLoginNewPwd(e.target.value)} 
+                  style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: 'white' }}
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.5)', marginBottom: '6px' }}>Confirm New Password</label>
+                <input 
+                  type="password" 
+                  value={firstLoginConfirmPwd} 
+                  onChange={(e) => setFirstLoginConfirmPwd(e.target.value)} 
+                  style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: 'white' }}
+                  required
+                />
+              </div>
+              <button type="submit" style={{ width: '100%', padding: '12px', background: 'linear-gradient(to right, #0ea5e9, #06b6d4)', border: 'none', borderRadius: '8px', color: 'white', fontWeight: 700, cursor: 'pointer', marginTop: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                Update Password & Login
+              </button>
+            </form>
           </div>
         </div>
       )}
