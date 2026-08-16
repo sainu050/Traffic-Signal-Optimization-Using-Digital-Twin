@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import SimulationCanvas from './SimulationCanvas'
 import {
   Sliders, Route, Users, Activity, FileText, 
   Settings, Power, Bell, Shield, UserCheck, Info,
@@ -218,27 +219,31 @@ export default function AdminDashboard({
       body: JSON.stringify({
         name: newOpName,
         email: newOpEmail,
-        password: 'password123',
-        phone: newOpPhone || '+1 555-0100',
         assignedIntersection: assignedInt
       })
     }).then(res => {
       if (res.ok) {
-        fetch('http://localhost:8000/api/operators')
-          .then(r => r.json())
-          .then(dataOp => setOperators(dataOp))
-          
-        logAction('Registered Operator', `${newOpName}`)
-        addToast(`Operator ${newOpName} added successfully.`, 'success')
-        setShowModal(null)
-        setNewOpName('')
-        setNewOpEmail('')
-        setNewOpPhone('')
-      } else {
-        addToast('Failed to save operator to database.', 'error')
+        return res.json()
       }
-    }).catch(() => {
-      addToast('Server offline. Cannot create operator.', 'error')
+      throw new Error('Failed to create operator.')
+    }).then(data => {
+      fetch('http://localhost:8000/api/operators')
+        .then(r => r.json())
+        .then(dataOp => setOperators(dataOp))
+        
+      logAction('Registered Operator', `${newOpName}`)
+      addToast(`Operator ${newOpName} created! Temporary password sent to email.`, 'success')
+      
+      if (data.tempPassword) {
+        alert(`Operator registered successfully!\n\nTemporary Password: ${data.tempPassword}\n\nThis has been sent to their email and logged in backend/sent_emails.txt.`);
+      }
+      
+      setShowModal(null)
+      setNewOpName('')
+      setNewOpEmail('')
+      setNewOpPhone('')
+    }).catch((err) => {
+      addToast(err.message || 'Server offline. Cannot create operator.', 'error')
     })
   }
 
@@ -382,6 +387,7 @@ export default function AdminDashboard({
 
   const handleLogout = () => {
     addToast('Signing out from Command Center...', 'info')
+    localStorage.removeItem('currentUser')
     setTimeout(() => {
       window.location.reload()
     }, 1000)
@@ -639,70 +645,18 @@ export default function AdminDashboard({
                     </div>
 
                     <div style={{ 
-                      height: 240, 
-                      background: 'rgba(5, 8, 22, 0.6)', 
+                      height: 480, 
+                      background: 'rgba(5, 8, 22, 0.4)', 
                       border: '1px solid rgba(255,255,255,0.06)', 
                       borderRadius: 14, 
                       position: 'relative', 
                       overflow: 'hidden', 
                       display: 'flex', 
                       alignItems: 'center', 
-                      justifyContent: 'center' 
+                      justifyContent: 'center',
+                      padding: '16px'
                     }}>
-                      <div style={{ position: 'absolute', inset: 0, opacity: 0.08, backgroundImage: 'radial-gradient(#06b6d4 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
-                      
-                      {/* Interactive Junctions list map layout */}
-                      <svg width="100%" height="100%" style={{ position: 'absolute', inset: 0 }}>
-                        <path d="M 50 120 L 500 120 M 270 10 L 270 230" stroke="rgba(255,255,255,0.08)" strokeWidth="16" strokeLinecap="round" />
-                        <path d="M 50 120 L 500 120 M 270 10 L 270 230" stroke="rgba(255,255,255,0.15)" strokeWidth="1" strokeDasharray="5,5" />
-                      </svg>
-                      
-                      {localIntersections.slice(0, 4).map((item, idx) => {
-                        const coords = [
-                          { x: 160, y: 120 },
-                          { x: 270, y: 70 },
-                          { x: 380, y: 120 },
-                          { x: 270, y: 170 }
-                        ][idx] || { x: 200, y: 100 }
-                        return (
-                          <div 
-                            key={item.id}
-                            style={{
-                              position: 'absolute',
-                              left: coords.x,
-                              top: coords.y,
-                              transform: 'translate(-50%, -50%)',
-                              background: '#070e20',
-                              border: `1px solid rgba(255,255,255,0.12)`,
-                              borderRadius: 12,
-                              padding: '8px 12px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 8,
-                              cursor: 'pointer',
-                              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                              transition: 'all 0.2s'
-                            }}
-                            onClick={() => {
-                              setSelectedIntId(item.id)
-                              setActiveTab('intersections')
-                              addToast(`Selected ${item.name} for timing controls`, 'info')
-                            }}
-                          >
-                            <span style={{ 
-                              width: 8, 
-                              height: 8, 
-                              borderRadius: '50%', 
-                              background: getCongestionColor(item.congestion),
-                              boxShadow: `0 0 8px ${getCongestionColor(item.congestion)}`
-                            }} />
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                              <span style={{ fontSize: 10.5, fontWeight: 700, color: '#fff' }}>{item.name.split(' & ')[0]}</span>
-                              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>{item.wait}s wait · {item.congestion}</span>
-                            </div>
-                          </div>
-                        )
-                      })}
+                      <SimulationCanvas />
                     </div>
                   </div>
 
@@ -1574,17 +1528,7 @@ export default function AdminDashboard({
                       required
                     />
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Phone Number</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      placeholder="+1 555-0192"
-                      value={newOpPhone}
-                      onChange={(e) => setNewOpPhone(e.target.value)}
-                      style={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: 8, width: '100%' }}
-                    />
-                  </div>
+
                   <div className="form-group">
                     <label className="form-label">Assign Junction</label>
                     <select 
