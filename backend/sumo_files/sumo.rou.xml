@@ -1,0 +1,25 @@
+<routes>
+    <vType id="car" accel="2.6" decel="4.5" sigma="0.5" length="5" minGap="6.0" maxSpeed="13.89" color="0,1,0"/>
+    <vType id="bus" accel="2.2" decel="3.5" sigma="0.5" length="12" minGap="6.0" maxSpeed="16.0" color="1,0,0"/>
+    <vType id="truck" accel="2.5" decel="4.0" sigma="0.5" length="15" minGap="6.0" maxSpeed="17.0" color="0,0,1"/>
+ 
+    <!-- North incoming flows (Straight, Left, Right) -->
+    <flow id="flow_n2s" type="bus" begin="0" end="3600" period="5.4" departLane="0" from="N2C" to="C2S"/>
+    <flow id="flow_n2e" type="bus" begin="0" end="3600" period="5.4" departLane="0" from="N2C" to="C2E"/>
+    <flow id="flow_n2w" type="bus" begin="0" end="3600" period="5.4" departLane="0" from="N2C" to="C2W"/>
+
+    <!-- South incoming flows (Straight, Left, Right) -->
+    <flow id="flow_s2n" type="truck" begin="0" end="3600" period="6.0" departLane="0" from="S2C" to="C2N"/>
+    <flow id="flow_s2w" type="truck" begin="0" end="3600" period="6.0" departLane="0" from="S2C" to="C2W"/>
+    <flow id="flow_s2e" type="truck" begin="0" end="3600" period="6.0" departLane="0" from="S2C" to="C2E"/>
+
+    <!-- West incoming flows (Straight, Left, Right) -->
+    <flow id="flow_w2e" type="car" begin="0" end="3600" period="5.4" departLane="0" from="W2C" to="C2E"/>
+    <flow id="flow_w2n" type="car" begin="0" end="3600" period="5.4" departLane="0" from="W2C" to="C2N"/>
+    <flow id="flow_w2s" type="car" begin="0" end="3600" period="5.4" departLane="0" from="W2C" to="C2S"/>
+
+    <!-- East incoming flows (Straight, Left, Right) -->
+    <flow id="flow_e2w" type="car" begin="0" end="3600" period="6.6" departLane="0" from="E2C" to="C2W"/>
+    <flow id="flow_e2s" type="car" begin="0" end="3600" period="6.6" departLane="0" from="E2C" to="C2S"/>
+    <flow id="flow_e2n" type="car" begin="0" end="3600" period="6.6" departLane="0" from="E2C" to="C2N"/>
+</routes>
