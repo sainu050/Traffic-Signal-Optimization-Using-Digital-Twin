@@ -63,6 +63,9 @@ export default function App() {
   const [firstLoginCurrentPwd, setFirstLoginCurrentPwd] = useState('');
   const [firstLoginNewPwd, setFirstLoginNewPwd] = useState('');
   const [firstLoginConfirmPwd, setFirstLoginConfirmPwd] = useState('');
+  const [showFirstLoginCurrent, setShowFirstLoginCurrent] = useState(false);
+  const [showFirstLoginNew, setShowFirstLoginNew] = useState(false);
+  const [showFirstLoginConfirm, setShowFirstLoginConfirm] = useState(false);
 
   // Admin Dashboard States
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -1072,33 +1075,96 @@ export default function App() {
             <form onSubmit={handleFirstLoginPasswordReset} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.5)', marginBottom: '6px' }}>Temporary Password</label>
-                <input 
-                  type="password" 
-                  value={firstLoginCurrentPwd} 
-                  onChange={(e) => setFirstLoginCurrentPwd(e.target.value)} 
-                  style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: 'white' }}
-                  required
-                />
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    type={showFirstLoginCurrent ? "text" : "password"} 
+                    value={firstLoginCurrentPwd} 
+                    onChange={(e) => setFirstLoginCurrentPwd(e.target.value)} 
+                    style={{ width: '100%', padding: '10px', paddingRight: '40px', background: '#0f172a', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: 'white' }}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowFirstLoginCurrent(!showFirstLoginCurrent)}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: 'rgba(255, 255, 255, 0.4)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: 0
+                    }}
+                  >
+                    {showFirstLoginCurrent ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.5)', marginBottom: '6px' }}>New Password</label>
-                <input 
-                  type="password" 
-                  value={firstLoginNewPwd} 
-                  onChange={(e) => setFirstLoginNewPwd(e.target.value)} 
-                  style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: 'white' }}
-                  required
-                />
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    type={showFirstLoginNew ? "text" : "password"} 
+                    value={firstLoginNewPwd} 
+                    onChange={(e) => setFirstLoginNewPwd(e.target.value)} 
+                    style={{ width: '100%', padding: '10px', paddingRight: '40px', background: '#0f172a', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: 'white' }}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowFirstLoginNew(!showFirstLoginNew)}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: 'rgba(255, 255, 255, 0.4)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: 0
+                    }}
+                  >
+                    {showFirstLoginNew ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.5)', marginBottom: '6px' }}>Confirm New Password</label>
-                <input 
-                  type="password" 
-                  value={firstLoginConfirmPwd} 
-                  onChange={(e) => setFirstLoginConfirmPwd(e.target.value)} 
-                  style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: 'white' }}
-                  required
-                />
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    type={showFirstLoginConfirm ? "text" : "password"} 
+                    value={firstLoginConfirmPwd} 
+                    onChange={(e) => setFirstLoginConfirmPwd(e.target.value)} 
+                    style={{ width: '100%', padding: '10px', paddingRight: '40px', background: '#0f172a', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: 'white' }}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowFirstLoginConfirm(!showFirstLoginConfirm)}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: 'rgba(255, 255, 255, 0.4)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: 0
+                    }}
+                  >
+                    {showFirstLoginConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
               <button type="submit" style={{ width: '100%', padding: '12px', background: 'linear-gradient(to right, #0ea5e9, #06b6d4)', border: 'none', borderRadius: '8px', color: 'white', fontWeight: 700, cursor: 'pointer', marginTop: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                 Update Password & Login
