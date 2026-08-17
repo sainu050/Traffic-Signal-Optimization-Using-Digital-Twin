@@ -4,19 +4,19 @@ A Digital Twin-based adaptive traffic signal optimization system using SUMO (Sim
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
-### 🖥️ Real-Time 2D WebSocket Simulation Canvas
+### Real-Time 2D WebSocket Simulation Canvas
 - **Telemetry Stream**: Live WebSocket stream broadcasting position, angle, vehicle type, and speed from the running SUMO instance.
 - **Custom Vector Drawings**: Renders vehicles dynamically (cars, buses, trucks) with detailed paint colors, tire offsets, mirror wings, tail lights, and glowing headlight beams.
 - **Smooth Trajectory Turns**: Real-world coordinates are mapped via a single Y-axis inversion conversion layer (`canvas_y = 300 - (y - 300) * 5`). Aligning the SUMO road edge width (`8.0m`) with the canvas lane spacing guarantees smooth, natural bezier curved turns without artificial snapping.
 
-### 🚦 4-Phase Adaptive Traffic Control
+### 4-Phase Adaptive Traffic Control
 - **Single-Direction Green Cycle**: Cycles one green light at a time (**North** ➔ **East** ➔ **South** ➔ **West**) through a 16-link junction state controller.
 - **Rule-Based Extensions**: Reads lane halting queues using TraCI (`getLastStepHaltingNumber`). If a lane has $> 3$ halting vehicles, it dynamically extends the green signal duration (up to 25 seconds) and writes an audit entry in the `system_logs` database.
 - **Manual Overrides & Auto-Release**: Allows Admins and Operators to lock any lane green. The override counts down in real time and automatically releases control back to `AUTO` mode once the timer hits `0`.
 
-### 🔒 Operator First-Login & Reset Password Workflow
+### Operator First-Login & Reset Password Workflow
 - **Simplified Registration**: Admins add Operators using only their **Name** and **Email Address**.
 - **Local SMTP Simulator**: Automatically generates an 8-character temporary password on account creation. Logs credentials to the server console and appends them to a local file at `backend/sent_emails.txt`.
 - **Forced Password Reset**: Detects `is_first_login` flags on login. Blocks user interaction with a viewport-wide password change overlay, forcing operators to configure a custom secure password before accessing the system.
@@ -24,7 +24,7 @@ A Digital Twin-based adaptive traffic signal optimization system using SUMO (Sim
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 ├── backend/
@@ -47,7 +47,7 @@ A Digital Twin-based adaptive traffic signal optimization system using SUMO (Sim
 
 ---
 
-## 🛠️ Setup Instructions
+## Setup Instructions
 
 ### 1. Prerequisites
 - **Python 3.10+**
