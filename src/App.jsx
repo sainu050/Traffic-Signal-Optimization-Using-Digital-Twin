@@ -1043,7 +1043,7 @@ export default function App() {
       )}
 
       {/* Forced Password Reset Modal for First Login */}
-      {currentUser && currentUser.is_first_login && (
+      {currentUser && currentUser.role === 'operator' && currentUser.is_first_login && (
         <div style={{
           position: 'fixed',
           top: 0,
