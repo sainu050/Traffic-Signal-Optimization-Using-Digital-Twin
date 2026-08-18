@@ -6,11 +6,12 @@ import {
   Satellite, Bell, BarChart3, Users, Route, Activity,
   LayoutDashboard, Sliders, ToggleLeft, Layers, Settings,
   Search, FileText, Database, Server, HardDrive, Play,
-  Pause, RefreshCw, Power, Compass, MessageSquare
+  Pause, RefreshCw, Power, Compass, MessageSquare, HelpCircle
 } from 'lucide-react';
 import './App.css';
 import LandingPage from './LandingPage';
 import AdminDashboard from './AdminDashboard';
+import OperatorDashboard from './OperatorDashboard';
 
 // ══════════════════════════════════════════
 // DATA MODEL & INITIAL CONFIGS
@@ -35,7 +36,8 @@ export default function App() {
     if (saved) {
       const user = JSON.parse(saved);
       if (user.role === 'admin') return 'admin_dashboard';
-      if (user.role === 'public' || user.role === 'operator') return 'public_dashboard';
+      if (user.role === 'operator') return 'operator_dashboard';
+      if (user.role === 'public') return 'public_dashboard';
     }
     return 'landing';
   });
@@ -43,6 +45,14 @@ export default function App() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotStep, setForgotStep] = useState(1); // 1: Email, 2: Security Q, 3: Reset Pwd
+  const [forgotSecurityQuestion, setForgotSecurityQuestion] = useState('');
+  const [forgotSecurityAnswer, setForgotSecurityAnswer] = useState('');
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
+  const [showForgotNewPassword, setShowForgotNewPassword] = useState(false);
+  const [showForgotConfirmPassword, setShowForgotConfirmPassword] = useState(false);
   const [toasts, setToasts] = useState([]);
   
   // Registration States
@@ -53,6 +63,8 @@ export default function App() {
   const [regConfirm, setRegConfirm] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regCity, setRegCity] = useState('');
+  const [regSecurityQuestion, setRegSecurityQuestion] = useState('What was the name of your first pet?');
+  const [regSecurityAnswer, setRegSecurityAnswer] = useState('');
   const [regTerms, setRegTerms] = useState(false);
   const [regAlerts, setRegAlerts] = useState(true);
   const [pwdStrength, setPwdStrength] = useState({ score: 0, text: '', class: '' });
@@ -66,6 +78,17 @@ export default function App() {
   const [showFirstLoginCurrent, setShowFirstLoginCurrent] = useState(false);
   const [showFirstLoginNew, setShowFirstLoginNew] = useState(false);
   const [showFirstLoginConfirm, setShowFirstLoginConfirm] = useState(false);
+  const [firstLoginName, setFirstLoginName] = useState('');
+  const [firstLoginPhone, setFirstLoginPhone] = useState('');
+  const [firstLoginCity, setFirstLoginCity] = useState('');
+
+  useEffect(() => {
+    if (currentUser) {
+      setFirstLoginName(currentUser.name || '');
+      setFirstLoginPhone(currentUser.phone || '');
+      setFirstLoginCity(currentUser.city || '');
+    }
+  }, [currentUser]);
 
   // Admin Dashboard States
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -193,7 +216,9 @@ export default function App() {
         setTimeout(() => {
           if (data.user.role === 'admin') {
             setCurrentPage('admin_dashboard');
-          } else if (data.user.role === 'public' || data.user.role === 'operator') {
+          } else if (data.user.role === 'operator') {
+            setCurrentPage('operator_dashboard');
+          } else if (data.user.role === 'public') {
             setCurrentPage('public_dashboard');
           } else {
             setCurrentPage('landing');
@@ -224,16 +249,19 @@ export default function App() {
       body: JSON.stringify({
         email: currentUser.email,
         current_password: firstLoginCurrentPwd,
-        new_password: firstLoginNewPwd
+        new_password: firstLoginNewPwd,
+        name: firstLoginName,
+        phone: firstLoginPhone,
+        city: firstLoginCity
       })
     }).then(res => {
       if (res.ok) {
         return res.json();
       }
       return res.json().then(data => { throw new Error(data.detail || 'Failed to change password.'); });
-    }).then(() => {
-      addToast('Password updated successfully! Welcome to UrbanFlow.', 'success');
-      const updatedUser = { ...currentUser, is_first_login: false };
+    }).then((data) => {
+      addToast('Password and profile details updated successfully! Welcome to UrbanFlow.', 'success');
+      const updatedUser = data.user;
       setCurrentUser(updatedUser);
       localStorage.setItem('currentUser', JSON.stringify(updatedUser));
       setFirstLoginCurrentPwd('');
@@ -242,6 +270,93 @@ export default function App() {
     }).catch(err => {
       addToast(err.message || 'Error updating password.', 'error');
     });
+  };
+
+  const handleForgotEmailSubmit = async (e) => {
+    e.preventDefault();
+    if (!forgotEmail.includes('@')) {
+      addToast('Please enter a valid email address.', 'error');
+      return;
+    }
+    addToast('Looking up account...', 'info');
+    try {
+      const res = await fetch('http://localhost:8000/api/forgot-password/question', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setForgotSecurityQuestion(data.question);
+        setForgotStep(2);
+        addToast('Account verified! Answer your security question.', 'success');
+      } else {
+        addToast(data.detail || 'Email lookup failed.', 'error');
+      }
+    } catch (err) {
+      addToast('Connection error to server.', 'error');
+    }
+  };
+
+  const handleForgotAnswerSubmit = async (e) => {
+    e.preventDefault();
+    addToast('Verifying answer...', 'info');
+    try {
+      const res = await fetch('http://localhost:8000/api/forgot-password/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail, answer: forgotSecurityAnswer })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setForgotStep(3);
+        addToast('Verification successful! You can now reset your password.', 'success');
+      } else {
+        addToast(data.detail || 'Incorrect answer.', 'error');
+      }
+    } catch (err) {
+      addToast('Connection error to server.', 'error');
+    }
+  };
+
+  const handleForgotResetSubmit = async (e) => {
+    e.preventDefault();
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      addToast('Passwords do not match.', 'error');
+      return;
+    }
+    if (forgotNewPassword.length < 6) {
+      addToast('Password must be at least 6 characters.', 'error');
+      return;
+    }
+    addToast('Resetting password...', 'info');
+    try {
+      const res = await fetch('http://localhost:8000/api/forgot-password/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: forgotEmail,
+          answer: forgotSecurityAnswer,
+          new_password: forgotNewPassword
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        addToast('Password reset successfully! Log in with your new password.', 'success');
+        // Clear all forgot states
+        setForgotEmail('');
+        setForgotSecurityQuestion('');
+        setForgotSecurityAnswer('');
+        setForgotNewPassword('');
+        setForgotConfirmPassword('');
+        setForgotStep(1);
+        setCurrentPage('login');
+      } else {
+        addToast(data.detail || 'Password reset failed.', 'error');
+      }
+    } catch (err) {
+      addToast('Connection error to server.', 'error');
+    }
   };
 
   const handleAssignController = (e) => {
@@ -326,7 +441,9 @@ export default function App() {
           password: regPassword,
           phone: regPhone,
           city: regCity,
-          role: 'PUBLIC'
+          role: 'PUBLIC',
+          security_question: regSecurityQuestion,
+          security_answer: regSecurityAnswer
         }),
       });
       const data = await response.json();
@@ -451,7 +568,7 @@ export default function App() {
                 <div className="form-group">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <label className="form-label" htmlFor="login-password">Password</label>
-                    <a className="forgot-link" href="#" onClick={e => e.preventDefault()}>Forgot?</a>
+                    <a className="forgot-link" href="#" onClick={e => { e.preventDefault(); setCurrentPage('forgot_password'); }}>Forgot?</a>
                   </div>
                   <div className="input-icon">
                     <Lock className="icon" size={16} />
@@ -474,6 +591,122 @@ export default function App() {
                   ← Back to Home
                 </span>
               </p>
+            </div>
+          </div>
+        </div>
+      )}      {currentPage === 'forgot_password' && (
+        <div className="auth-page page-enter dark">
+          {/* Left Visual panel */}
+          <div className="auth-visual">
+            <div className="auth-visual-inner">
+              <div className="auth-visual-logo">
+                <div className="logo" onClick={() => { setCurrentPage('landing'); setForgotStep(1); }}>
+                  <div className="logo-icon"><i className="fas fa-traffic-light"></i></div>
+                  <span className="logo-text">Urban<span>Flow</span></span>
+                </div>
+              </div>
+              <h2 className="auth-visual-title">Reset Your<br/>Account Password</h2>
+              <p className="auth-visual-desc">
+                UrbanFlow uses security questions to protect your account. Answer the question you set 
+                during registration to reset your password instantly.
+              </p>
+            </div>
+          </div>
+
+          {/* Right form panel */}
+          <div className="auth-form-panel">
+            <div className="auth-form-scroll">
+              <div className="logo" onClick={() => { setCurrentPage('landing'); setForgotStep(1); }} style={{ marginBottom: '32px' }}>
+                <div className="logo-icon"><i className="fas fa-traffic-light"></i></div>
+                <span className="logo-text">Urban<span>Flow</span></span>
+              </div>
+
+              <div className="auth-form-header">
+                <h1 className="auth-form-title">Forgot Password</h1>
+                <p className="auth-form-subtitle">
+                  {forgotStep === 1 && "Enter your email below to verify your account."}
+                  {forgotStep === 2 && "Answer the security question you configured."}
+                  {forgotStep === 3 && "Configure a new secure password for your account."}
+                </p>
+              </div>
+
+              {forgotStep === 1 && (
+                <form onSubmit={handleForgotEmailSubmit} className="auth-form" style={{ marginTop: '24px' }}>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="forgot-email">Email Address</label>
+                    <div className="input-icon">
+                      <Mail className="icon" size={16} />
+                      <input className="form-control" type="email" id="forgot-email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} placeholder="alex@example.com" required />
+                    </div>
+                  </div>
+
+                  <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '13px', marginTop: '16px' }}>
+                    Verify Email
+                  </button>
+                </form>
+              )}
+
+              {forgotStep === 2 && (
+                <form onSubmit={handleForgotAnswerSubmit} className="auth-form" style={{ marginTop: '24px' }}>
+                  <div className="form-group">
+                    <label className="form-label" style={{ color: 'rgba(255, 255, 255, 0.4)' }}>Your Security Question</label>
+                    <div style={{ padding: '14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', fontWeight: 600, fontSize: '14px', margin: '4px 0 16px', color: '#38bdf8' }}>
+                      {forgotSecurityQuestion}
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="forgot-answer">Your Answer</label>
+                    <div className="input-icon">
+                      <HelpCircle className="icon" size={16} />
+                      <input className="form-control" type="text" id="forgot-answer" value={forgotSecurityAnswer} onChange={(e) => setForgotSecurityAnswer(e.target.value)} placeholder="Enter your answer" required />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                    <button type="button" onClick={() => setForgotStep(1)} className="btn btn-secondary" style={{ flex: 1, justifyContent: 'center', padding: '13px', color: 'white', borderColor: 'rgba(255,255,255,0.1)' }}>
+                      Back
+                    </button>
+                    <button type="submit" className="btn btn-primary" style={{ flex: 2, justifyContent: 'center', padding: '13px' }}>
+                      Verify Answer
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {forgotStep === 3 && (
+                <form onSubmit={handleForgotResetSubmit} className="auth-form" style={{ marginTop: '24px' }}>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="forgot-new-pwd">New Password</label>
+                    <div className="input-icon">
+                      <Lock className="icon" size={16} />
+                      <input className="form-control" type={showForgotNewPassword ? 'text' : 'password'} id="forgot-new-pwd" value={forgotNewPassword} onChange={(e) => setForgotNewPassword(e.target.value)} placeholder="Enter new password" required />
+                      <button type="button" className="password-toggle" onClick={() => setShowForgotNewPassword(!showForgotNewPassword)}>
+                        {showForgotNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="forgot-confirm-pwd">Confirm New Password</label>
+                    <div className="input-icon">
+                      <Lock className="icon" size={16} />
+                      <input className="form-control" type={showForgotConfirmPassword ? 'text' : 'password'} id="forgot-confirm-pwd" value={forgotConfirmPassword} onChange={(e) => setForgotConfirmPassword(e.target.value)} placeholder="Confirm new password" required />
+                      <button type="button" className="password-toggle" onClick={() => setShowForgotConfirmPassword(!showForgotConfirmPassword)}>
+                        {showForgotConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '13px', marginTop: '16px' }}>
+                    Reset Password
+                  </button>
+                </form>
+              )}
+
+              <div className="auth-footer-text" style={{ marginTop: '24px' }}>
+                Remember your password? <span onClick={() => { setCurrentPage('login'); setForgotStep(1); }} style={{ cursor: 'pointer', color: '#0ea5e9', fontWeight: 600 }}>Log In</span>
+              </div>
             </div>
           </div>
         </div>
@@ -568,6 +801,31 @@ export default function App() {
                 </div>
 
                 <div className="form-group">
+                  <label className="form-label" htmlFor="reg-security-question">Security Question</label>
+                  <select 
+                    className="form-control" 
+                    id="reg-security-question" 
+                    value={regSecurityQuestion} 
+                    onChange={(e) => setRegSecurityQuestion(e.target.value)}
+                    style={{ background: '#1e293b', border: '1px solid rgba(255, 255, 255, 0.1)', color: 'white', cursor: 'pointer', padding: '12px', borderRadius: '8px', width: '100%' }}
+                  >
+                    <option value="What was the name of your first pet?">What was the name of your first pet?</option>
+                    <option value="What is your mother's maiden name?">What is your mother's maiden name?</option>
+                    <option value="What school did you attend for sixth grade?">What school did you attend for sixth grade?</option>
+                    <option value="What was the make of your first car?">What was the make of your first car?</option>
+                    <option value="What is your favorite city?">What is your favorite city?</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" htmlFor="reg-security-answer">Security Answer</label>
+                  <div className="input-icon">
+                    <HelpCircle className="icon" size={16} />
+                    <input className="form-control" type="text" id="reg-security-answer" value={regSecurityAnswer} onChange={(e) => setRegSecurityAnswer(e.target.value)} placeholder="Enter your answer" required />
+                  </div>
+                </div>
+
+                <div className="form-group">
                   <label className="form-label" htmlFor="reg-password">Password</label>
                   <div className="input-icon">
                     <Lock className="icon" size={16} />
@@ -631,6 +889,14 @@ export default function App() {
           vehiclesCount={vehiclesCount}
           addToast={addToast}
           currentUser={currentUser}
+        />
+      )}
+
+      {currentPage === 'operator_dashboard' && (
+        <OperatorDashboard 
+          addToast={addToast}
+          currentUser={currentUser}
+          setCurrentUser={setCurrentUser}
         />
       )}
 
@@ -1073,6 +1339,38 @@ export default function App() {
               Welcome to UrbanFlow! For security purposes, you are required to change your temporary password before accessing the system.
             </p>
             <form onSubmit={handleFirstLoginPasswordReset} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.5)', marginBottom: '6px' }}>Full Name</label>
+                <input 
+                  type="text" 
+                  value={firstLoginName} 
+                  onChange={(e) => setFirstLoginName(e.target.value)} 
+                  style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: 'white' }}
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.5)', marginBottom: '6px' }}>Phone Number</label>
+                <input 
+                  type="tel" 
+                  value={firstLoginPhone} 
+                  onChange={(e) => setFirstLoginPhone(e.target.value)} 
+                  style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: 'white' }}
+                  placeholder="+91 98765 43210"
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.5)', marginBottom: '6px' }}>City</label>
+                <input 
+                  type="text" 
+                  value={firstLoginCity} 
+                  onChange={(e) => setFirstLoginCity(e.target.value)} 
+                  style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: 'white' }}
+                  placeholder="e.g. Kochi"
+                  required
+                />
+              </div>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.5)', marginBottom: '6px' }}>Temporary Password</label>
                 <div style={{ position: 'relative' }}>
