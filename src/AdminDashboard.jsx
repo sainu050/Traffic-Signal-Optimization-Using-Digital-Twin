@@ -136,6 +136,20 @@ export default function AdminDashboard({
     fetchData()
   }, [])
 
+  const handleMetricsUpdate = (metrics) => {
+    setLocalIntersections(prev => prev.map(int => {
+      if (int.name === 'Baker Jn' || int.id === 1) {
+        return {
+          ...int,
+          vehicles: metrics.vehicleCount,
+          wait: Math.round(metrics.avgWait),
+          congestion: metrics.congestion
+        }
+      }
+      return int
+    }))
+  }
+
   useEffect(() => {
     const timer = setInterval(() => {
       setSysTime(new Date().toLocaleTimeString())
@@ -427,13 +441,13 @@ export default function AdminDashboard({
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
           {[
             { id: 'dashboard', label: 'Dashboard', icon: <Activity size={18} /> },
-            { id: 'operators', label: 'Operators', icon: <UserCheck size={18} /> },
-            { id: 'intersections', label: 'Intersection Management', icon: <Route size={18} /> },
-            { id: 'citizens', label: 'Citizen Accounts', icon: <Users size={18} /> },
+            { id: 'operators', label: 'Operators', icon: <UserCheck size={18} />, adminOnly: true },
+            { id: 'intersections', label: 'Intersection Management', icon: <Route size={18} />, adminOnly: true },
+            { id: 'citizens', label: 'Citizen Accounts', icon: <Users size={18} />, adminOnly: true },
             { id: 'incidents', label: 'Traffic Incidents', icon: <AlertTriangle size={18} /> },
             { id: 'logs', label: 'Activity Logs', icon: <FileText size={18} /> },
             { id: 'monitoring', label: 'System Monitoring', icon: <Sliders size={18} /> },
-          ].map(item => {
+          ].filter(item => !item.adminOnly || currentUser?.role === 'admin').map(item => {
             const active = activeTab === item.id
             return (
               <button
@@ -656,7 +670,7 @@ export default function AdminDashboard({
                       justifyContent: 'center',
                       padding: '16px'
                     }}>
-                      <SimulationCanvas />
+                      <SimulationCanvas onMetricsUpdate={handleMetricsUpdate} />
                     </div>
                   </div>
 
@@ -1012,10 +1026,20 @@ export default function AdminDashboard({
                               fontSize: 12,
                               cursor: 'pointer'
                             }}
-                            onClick={() => {
-                              setOperators(prev => prev.filter(o => o.id !== op.id))
-                              logAction('Deleted Operator Account', `${op.name} (${op.id})`)
-                              addToast(`Operator ${op.name} deleted.`, 'info')
+                            onClick={async () => {
+                              try {
+                                const userId = op.db_id || parseInt(op.id.replace('OP-', ''));
+                                const res = await fetch(`http://localhost:8000/api/users/${userId}`, { method: 'DELETE' });
+                                if (res.ok) {
+                                  setOperators(prev => prev.filter(o => o.id !== op.id));
+                                  logAction('Deleted Operator Account', `${op.name} (${op.id})`);
+                                  addToast(`Operator ${op.name} deleted.`, 'info');
+                                } else {
+                                  addToast("Failed to delete operator from database.", "error");
+                                }
+                              } catch (err) {
+                                addToast(`Error: ${err.message}`, "error");
+                              }
                             }}
                           >
                             Remove
@@ -1215,7 +1239,7 @@ export default function AdminDashboard({
                             {cit.status}
                           </span>
                         </td>
-                        <td style={{ padding: '14px 16px' }}>
+                        <td style={{ padding: '14px 16px', display: 'flex', gap: '8px' }}>
                           <button
                             style={{
                               background: 'transparent',
@@ -1230,6 +1254,34 @@ export default function AdminDashboard({
                             onClick={() => toggleCitizenStatus(cit.id)}
                           >
                             {cit.status === 'Active' ? 'Suspend' : 'Activate'}
+                          </button>
+                          <button
+                            style={{
+                              background: 'transparent',
+                              border: '1px solid rgba(239, 68, 68, 0.25)',
+                              color: '#ef4444',
+                              borderRadius: 8,
+                              padding: '5px 10px',
+                              fontSize: 12,
+                              cursor: 'pointer'
+                            }}
+                            onClick={async () => {
+                              try {
+                                const userId = cit.db_id || parseInt(cit.id.replace('CIT-', ''));
+                                const res = await fetch(`http://localhost:8000/api/users/${userId}`, { method: 'DELETE' });
+                                if (res.ok) {
+                                  setCitizens(prev => prev.filter(c => c.id !== cit.id));
+                                  logAction('Deleted Citizen Account', `${cit.name} (${cit.id})`);
+                                  addToast(`Citizen ${cit.name} deleted.`, 'info');
+                                } else {
+                                  addToast("Failed to delete citizen from database.", "error");
+                                }
+                              } catch (err) {
+                                addToast(`Error: ${err.message}`, "error");
+                              }
+                            }}
+                          >
+                            Remove
                           </button>
                         </td>
                       </tr>
