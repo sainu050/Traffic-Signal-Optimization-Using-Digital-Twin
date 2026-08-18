@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 
-export default function SimulationCanvas() {
+export default function SimulationCanvas({ onMetricsUpdate }) {
   const canvasRef = useRef(null)
   const [simulationState, setSimulationState] = useState({
     signals: { horizontal: 'green', vertical: 'red' },
@@ -21,6 +21,15 @@ export default function SimulationCanvas() {
       try {
         const state = JSON.parse(event.data)
         setSimulationState(state)
+        
+        // Trigger parent callback if provided
+        if (onMetricsUpdate) {
+          onMetricsUpdate({
+            vehicleCount: state.vehicle_count || state.vehicles?.length || 0,
+            avgWait: state.avg_wait || 0,
+            congestion: (state.vehicles?.length || 0) >= 10 ? 'High' : ((state.vehicles?.length || 0) >= 4 ? 'Moderate' : 'Low')
+          })
+        }
       } catch (err) {
         console.error('WS parse error:', err)
       }
@@ -233,6 +242,51 @@ export default function SimulationCanvas() {
     drawRealTrafficLight(250, 250, signals.north || 'red', timers.north || 0)
     // South incoming light (controls South-to-North, bottom-right corner)
     drawRealTrafficLight(350, 350, signals.south || 'red', timers.south || 0)
+
+    // 5. Calculate and Draw Lane Vehicle Count Badges
+    let northCount = 0
+    let southCount = 0
+    let westCount = 0
+    let eastCount = 0
+
+    simulationState.vehicles.forEach((veh) => {
+      const scale = 5.0
+      let canvasX = 300 + (veh.x - 300) * scale
+      let canvasY = 300 - (veh.y - 300) * scale
+
+      if (canvasY < 260 && canvasX >= 260 && canvasX <= 300) {
+        northCount++
+      } else if (canvasY > 340 && canvasX >= 300 && canvasX <= 340) {
+        southCount++
+      } else if (canvasX < 260 && canvasY >= 300 && canvasY <= 340) {
+        westCount++
+      } else if (canvasX > 340 && canvasY >= 260 && canvasY <= 300) {
+        eastCount++
+      }
+    })
+
+    const drawLaneCountBadge = (x, y, count) => {
+      ctx.save()
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.9)'
+      ctx.strokeStyle = 'rgba(6, 182, 212, 0.35)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.roundRect(x - 20, y - 9, 40, 18, 5)
+      ctx.fill()
+      ctx.stroke()
+
+      ctx.fillStyle = '#06b6d4'
+      ctx.font = 'bold 10px monospace'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(`${count} Veh`, x, y)
+      ctx.restore()
+    }
+
+    drawLaneCountBadge(225, 180, northCount)
+    drawLaneCountBadge(375, 420, southCount)
+    drawLaneCountBadge(180, 375, westCount)
+    drawLaneCountBadge(420, 225, eastCount)
 
     // 6. Draw Simulated Vehicles
     simulationState.vehicles.forEach((veh) => {
