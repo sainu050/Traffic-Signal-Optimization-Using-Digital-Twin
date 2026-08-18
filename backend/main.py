@@ -27,6 +27,8 @@ class User(Base):
     role = Column(String(20), default="PUBLIC", nullable=False)
     status = Column(String(20), default="ACTIVE", nullable=False)
     is_first_login = Column(Boolean, default=True, nullable=False)
+    security_question = Column(String(255), nullable=True)
+    security_answer = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 class Intersection(Base):
@@ -110,6 +112,8 @@ class UserRegisterSchema(BaseModel):
     phone: str | None = None
     city: str | None = None
     role: str = "PUBLIC"
+    security_question: str | None = None
+    security_answer: str | None = None
 
 class UserLoginSchema(BaseModel):
     email: EmailStr
@@ -168,7 +172,9 @@ def register_user(user_data: UserRegisterSchema, db: Session = Depends(get_db)):
         phone=user_data.phone,
         city=user_data.city,
         role=role_upper,
-        status="ACTIVE"
+        status="ACTIVE",
+        security_question=user_data.security_question,
+        security_answer=user_data.security_answer
     )
 
     db.add(new_user)
@@ -225,6 +231,26 @@ class UserChangePasswordSchema(BaseModel):
     email: EmailStr
     current_password: str
     new_password: str
+    name: str | None = None
+    phone: str | None = None
+    city: str | None = None
+
+class UserProfileUpdateSchema(BaseModel):
+    name: str
+    phone: str | None = None
+    city: str | None = None
+
+class ForgotPasswordQuestionRequest(BaseModel):
+    email: EmailStr
+
+class ForgotPasswordVerifyRequest(BaseModel):
+    email: EmailStr
+    answer: str
+
+class ForgotPasswordResetRequest(BaseModel):
+    email: EmailStr
+    answer: str
+    new_password: str
 
 @app.post("/api/users/change-password")
 def change_password(data: UserChangePasswordSchema, db: Session = Depends(get_db)):
@@ -240,9 +266,95 @@ def change_password(data: UserChangePasswordSchema, db: Session = Depends(get_db
     
     user.password = hashed_password
     user.is_first_login = False
+    
+    # Save other details if provided during reset
+    if data.name:
+        user.name = data.name
+    if data.phone is not None:
+        user.phone = data.phone
+    if data.city is not None:
+        user.city = data.city
+        
     db.commit()
     
-    return {"success": True, "message": "Password updated successfully."}
+    return {
+        "success": True, 
+        "message": "Password and details updated successfully.",
+        "user": {
+            "id": user.user_id,
+            "name": user.name,
+            "email": user.email,
+            "phone": user.phone or "",
+            "city": user.city or "",
+            "role": user.role.lower(),
+            "is_first_login": False
+        }
+    }
+
+@app.put("/api/users/{user_id}/profile")
+def update_profile(user_id: int, data: UserProfileUpdateSchema, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    
+    user.name = data.name
+    user.phone = data.phone
+    user.city = data.city
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": "Profile updated successfully.",
+        "user": {
+            "id": user.user_id,
+            "name": user.name,
+            "email": user.email,
+            "phone": user.phone or "",
+            "city": user.city or "",
+            "role": user.role.lower(),
+            "is_first_login": user.is_first_login
+        }
+    }
+
+@app.post("/api/forgot-password/question")
+def get_forgot_password_question(data: ForgotPasswordQuestionRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="An account with this email address does not exist.")
+    if not user.security_question:
+        raise HTTPException(status_code=400, detail="No security question has been set for this account. Please contact system admin.")
+    return {"success": True, "question": user.security_question}
+
+@app.post("/api/forgot-password/verify")
+def verify_security_answer(data: ForgotPasswordVerifyRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if not user.security_answer:
+        raise HTTPException(status_code=400, detail="Security answer not set.")
+    
+    if user.security_answer.strip().lower() != data.answer.strip().lower():
+        raise HTTPException(status_code=400, detail="Incorrect security answer.")
+    return {"success": True, "message": "Verification successful."}
+
+@app.post("/api/forgot-password/reset")
+def reset_password_with_security_answer(data: ForgotPasswordResetRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if not user.security_answer:
+        raise HTTPException(status_code=400, detail="Security answer not set.")
+    
+    if user.security_answer.strip().lower() != data.answer.strip().lower():
+        raise HTTPException(status_code=400, detail="Incorrect security answer.")
+        
+    salt = bcrypt.gensalt()
+    hashed_password = bcrypt.hashpw(data.new_password.encode('utf-8'), salt).decode('utf-8')
+    
+    user.password = hashed_password
+    user.is_first_login = False
+    db.commit()
+    return {"success": True, "message": "Password reset successfully. You can now log in."}
 
 # ─── INTERSECTION ROUTES ───
 
@@ -333,6 +445,15 @@ def override_intersection(id: int, data: IntersectionOverride, db: Session = Dep
     db.commit()
     return {"success": True}
 
+@app.put("/api/intersections/{id}/release")
+def release_intersection(id: int, db: Session = Depends(get_db)):
+    sig = db.query(TrafficSignal).filter(TrafficSignal.intersection_id == id).order_by(TrafficSignal.signal_id.desc()).first()
+    if sig:
+        sig.mode = "AUTO"
+        sig.current_state = "north_green"
+        db.commit()
+    return {"success": True}
+
 # ─── CITIZENS (PUBLIC USERS) ROUTE ───
 
 @app.get("/api/simulation/debug")
@@ -369,6 +490,7 @@ def get_citizens(db: Session = Depends(get_db)):
     users = db.query(User).filter(User.role == "PUBLIC").order_by(User.user_id.desc()).all()
     return [{
         "id": f"CIT-{u.user_id}",
+        "db_id": u.user_id,
         "name": u.name,
         "email": u.email,
         "phone": u.phone or "",
@@ -503,6 +625,17 @@ def assign_operator(id: int, data: OperatorAssign, db: Session = Depends(get_db)
     db.commit()
     return {"success": True, "message": "Operator assignment updated."}
 
+@app.delete("/api/users/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    # Cascade delete assignments
+    db.query(OperatorAssignment).filter(OperatorAssignment.operator_id == user_id).delete()
+    db.delete(user)
+    db.commit()
+    return {"success": True, "message": "User deleted successfully."}
+
 # ─── INCIDENT ROUTES ───
 
 @app.get("/api/incidents")
@@ -624,9 +757,10 @@ def run_simulation_thread():
             
             if sig:
                 if sig.mode == "MANUAL":
-                    # --- MANUAL OVERRIDE MODE ---
                     state = sig.current_state
-                    if state == "green":
+                    if state in ["north_green", "east_green", "south_green", "west_green"]:
+                        current_phase = state
+                    elif state == "green":
                         current_phase = "north_green"
                     elif state == "red":
                         current_phase = "south_green"
@@ -873,7 +1007,7 @@ async def startup_event():
     global main_loop
     main_loop = asyncio.get_event_loop()
     
-    # Ensure users table has is_first_login column
+    # Ensure users table has is_first_login, security_question, and security_answer columns
     db = SessionLocal()
     try:
         try:
@@ -882,8 +1016,123 @@ async def startup_event():
             db.rollback()
             db.execute(text("ALTER TABLE users ADD COLUMN is_first_login BOOLEAN DEFAULT TRUE"))
             db.commit()
+
+        try:
+            db.execute(text("SELECT security_question FROM users LIMIT 1"))
+        except Exception:
+            db.rollback()
+            db.execute(text("ALTER TABLE users ADD COLUMN security_question VARCHAR(255)"))
+            db.execute(text("ALTER TABLE users ADD COLUMN security_answer VARCHAR(255)"))
+            db.commit()
+
+        # Backfill default question/answer for any records where it is NULL
+        try:
+            db.execute(text("UPDATE users SET security_question = 'What is your favorite city?', security_answer = 'Kochi' WHERE security_question IS NULL"))
+            db.commit()
+        except Exception:
+            pass
     except Exception:
         pass
+    finally:
+        db.close()
+
+    # Seed initial real project data dynamically if missing
+    db = SessionLocal()
+    try:
+        # 1. Seed Baker Jn intersection
+        baker = db.query(Intersection).filter(Intersection.intersection_name == "Baker Jn").first()
+        if not baker:
+            # Check if ID 1 is occupied
+            existing_1 = db.query(Intersection).filter(Intersection.intersection_id == 1).first()
+            if existing_1:
+                # Rename existing intersection to Baker Jn to keep ID 1
+                existing_1.intersection_name = "Baker Jn"
+                existing_1.location = "Baker Junction Center"
+                db.commit()
+                baker = existing_1
+            else:
+                baker = Intersection(
+                    intersection_id=1,
+                    intersection_name="Baker Jn",
+                    location="Baker Junction Center",
+                    status="Active"
+                )
+                db.add(baker)
+                db.commit()
+                db.refresh(baker)
+            
+            # Seed default TrafficSignal for Baker Jn
+            sig_baker = db.query(TrafficSignal).filter(TrafficSignal.intersection_id == baker.intersection_id).first()
+            if not sig_baker:
+                sig_baker = TrafficSignal(
+                    intersection_id=baker.intersection_id,
+                    current_state="north_green",
+                    green_time=12,
+                    yellow_time=3,
+                    red_time=12,
+                    mode="AUTO"
+                )
+                db.add(sig_baker)
+                db.commit()
+        else:
+            # Verify its ID is 1 or make sure Baker Jn has a signal
+            sig_baker = db.query(TrafficSignal).filter(TrafficSignal.intersection_id == baker.intersection_id).first()
+            if not sig_baker:
+                sig_baker = TrafficSignal(
+                    intersection_id=baker.intersection_id,
+                    current_state="north_green",
+                    green_time=12,
+                    yellow_time=3,
+                    red_time=12,
+                    mode="AUTO"
+                )
+                db.add(sig_baker)
+                db.commit()
+
+        # 2. Seed Operator account (operator@gmail.com)
+        op = db.query(User).filter(User.email == "operator@gmail.com").first()
+        if not op:
+            op = User(
+                name="Traffic Controller",
+                email="operator@gmail.com",
+                password="$2b$12$W9mX0LsnYI/lE.vQ72f0G.r3uKq9f2/HlK2Nq0s7mDqg5Jc.E93fK", # operator123
+                role="OPERATOR",
+                status="ACTIVE",
+                is_first_login=True,
+                security_question="What is your favorite city?",
+                security_answer="Kochi"
+            )
+            db.add(op)
+            db.commit()
+            db.refresh(op)
+
+        # Ensure operator is assigned to Baker Jn
+        assign = db.query(OperatorAssignment).filter(OperatorAssignment.operator_id == op.user_id).first()
+        if not assign:
+            assign = OperatorAssignment(
+                operator_id=op.user_id,
+                intersection_id=baker.intersection_id
+            )
+            db.add(assign)
+            db.commit()
+
+        # 3. Seed Citizen account (citizen@gmail.com)
+        cit = db.query(User).filter(User.email == "citizen@gmail.com").first()
+        if not cit:
+            cit = User(
+                name="Citizen User",
+                email="citizen@gmail.com",
+                password="$2b$12$dB3g7qWJ264B44rM/R355OHZt5lB8Bf.gS95.u3mNf/wJ3GleE5t2", # citizen123 (uses admin123 hash)
+                role="PUBLIC",
+                status="ACTIVE",
+                is_first_login=False,
+                security_question="What is your favorite city?",
+                security_answer="Kochi"
+            )
+            db.add(cit)
+            db.commit()
+    except Exception:
+        db.rollback()
     finally:
         db.close()
         
