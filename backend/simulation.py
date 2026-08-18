@@ -78,14 +78,18 @@ class TrafficSimulation:
     def get_state(self):
         vehicles = []
         if not self.sumo_started:
-            return {"signals": self.signals, "vehicles": []}
+            return {"signals": self.signals, "vehicles": [], "avg_wait": 0, "vehicle_count": 0}
             
+        total_wait = 0
         try:
             # Query active vehicle listings from SUMO
-            for veh_id in traci.vehicle.getIDList():
+            veh_ids = traci.vehicle.getIDList()
+            for veh_id in veh_ids:
                 x, y = traci.vehicle.getPosition(veh_id)
                 angle = traci.vehicle.getAngle(veh_id)
                 vtype = traci.vehicle.getTypeID(veh_id)
+                wait = traci.vehicle.getWaitingTime(veh_id)
+                total_wait += wait
                 
                 # Assign visual color and length based on type
                 color = "#3b82f6" # default car blue
@@ -104,15 +108,20 @@ class TrafficSimulation:
                     "y": round(y, 2),
                     "angle": angle,
                     "color": color,
-                    "size": size
+                    "size": size,
+                    "wait": wait
                 })
         except Exception:
             pass
             
+        avg_wait = total_wait / len(vehicles) if len(vehicles) > 0 else 0.0
+            
         return {
             "signals": self.signals,
             "timers": getattr(self, "signal_timers", {"horizontal": 12, "vertical": 15}),
-            "vehicles": vehicles
+            "vehicles": vehicles,
+            "avg_wait": round(avg_wait, 1),
+            "vehicle_count": len(vehicles)
         }
 
     def __del__(self):
