@@ -5,7 +5,7 @@ import {
   Settings, Power, Bell, Shield, UserCheck, Info,
   Trash2, Plus, CheckCircle, AlertTriangle, RefreshCw,
   Search, Play, Pause, Database, Server, ChevronRight,
-  Clock, ToggleLeft, User, Eye, Lock
+  Clock, ToggleLeft, User, Eye, Lock, Mail
 } from 'lucide-react'
 
 // Initial Mock Data
@@ -70,8 +70,13 @@ export default function AdminDashboard({
   // New item form state
   const [newOpName, setNewOpName] = useState('')
   const [newOpEmail, setNewOpEmail] = useState('')
+  const [newOpEmailTouched, setNewOpEmailTouched] = useState(false)
   const [newOpPhone, setNewOpPhone] = useState('')
   const [newOpInt, setNewOpInt] = useState('')
+
+  const isValidEmail = (email) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())
+  }
 
   const [newIntName, setNewIntName] = useState('')
   const [newIntCongestion, setNewIntCongestion] = useState('Low')
@@ -224,6 +229,11 @@ export default function AdminDashboard({
       addToast('Please fill out name and email.', 'error')
       return
     }
+    if (!isValidEmail(newOpEmail)) {
+      setNewOpEmailTouched(true)
+      addToast('Please enter a valid email address for the operator.', 'error')
+      return
+    }
     
     const assignedInt = newOpInt || 'Unassigned'
     
@@ -235,11 +245,12 @@ export default function AdminDashboard({
         email: newOpEmail,
         assignedIntersection: assignedInt
       })
-    }).then(res => {
+    }).then(async res => {
       if (res.ok) {
         return res.json()
       }
-      throw new Error('Failed to create operator.')
+      const errData = await res.json().catch(() => ({}))
+      throw new Error(errData.detail || 'Failed to create operator.')
     }).then(data => {
       fetch('http://localhost:8000/api/operators')
         .then(r => r.json())
@@ -255,6 +266,7 @@ export default function AdminDashboard({
       setShowModal(null)
       setNewOpName('')
       setNewOpEmail('')
+      setNewOpEmailTouched(false)
       setNewOpPhone('')
     }).catch((err) => {
       addToast(err.message || 'Server offline. Cannot create operator.', 'error')
@@ -1545,7 +1557,7 @@ export default function AdminDashboard({
                 fontSize: 20,
                 cursor: 'pointer'
               }}
-              onClick={() => setShowModal(null)}
+              onClick={() => { setShowModal(null); setNewOpEmailTouched(false); }}
             >
               &times;
             </button>
@@ -1570,15 +1582,71 @@ export default function AdminDashboard({
                   </div>
                   <div className="form-group">
                     <label className="form-label">Email Address</label>
-                    <input 
-                      type="email" 
-                      className="form-control" 
-                      placeholder="operator@demo.com"
-                      value={newOpEmail}
-                      onChange={(e) => setNewOpEmail(e.target.value)}
-                      style={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: 8, width: '100%' }}
-                      required
-                    />
+                    <div style={{ position: 'relative' }}>
+                      <input 
+                        type="email" 
+                        className="form-control" 
+                        placeholder="operator@demo.com"
+                        value={newOpEmail}
+                        onChange={(e) => {
+                          setNewOpEmail(e.target.value);
+                          if (!newOpEmailTouched && e.target.value.length > 0) {
+                            setNewOpEmailTouched(true);
+                          }
+                        }}
+                        onBlur={() => {
+                          if (newOpEmail.length > 0) setNewOpEmailTouched(true);
+                        }}
+                        style={{ 
+                          background: '#0f172a', 
+                          border: `1px solid ${newOpEmailTouched && newOpEmail.length > 0 
+                            ? (isValidEmail(newOpEmail) ? '#10b981' : '#ef4444') 
+                            : 'rgba(255,255,255,0.1)'}`, 
+                          boxShadow: newOpEmailTouched && newOpEmail.length > 0 
+                            ? (isValidEmail(newOpEmail) ? '0 0 0 3px rgba(16, 185, 129, 0.15)' : '0 0 0 3px rgba(239, 68, 68, 0.15)') 
+                            : undefined,
+                          color: 'white', 
+                          padding: '10px 40px 10px 10px', 
+                          borderRadius: 8, 
+                          width: '100%' 
+                        }}
+                        required
+                      />
+                      {newOpEmailTouched && newOpEmail.length > 0 && (
+                        <div style={{
+                          position: 'absolute',
+                          right: '12px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          pointerEvents: 'none'
+                        }}>
+                          {isValidEmail(newOpEmail) ? (
+                            <CheckCircle size={16} color="#10b981" />
+                          ) : (
+                            <AlertTriangle size={16} color="#ef4444" />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {newOpEmailTouched && newOpEmail.length > 0 && (
+                      <div style={{ 
+                        fontSize: '11.5px', 
+                        marginTop: '5px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '4px',
+                        color: isValidEmail(newOpEmail) ? '#10b981' : '#ef4444',
+                        fontWeight: 500 
+                      }}>
+                        {isValidEmail(newOpEmail) ? (
+                          <span>✓ Valid operator email</span>
+                        ) : (
+                          <span>Please enter a valid email format (e.g. operator@domain.com)</span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="form-group">
