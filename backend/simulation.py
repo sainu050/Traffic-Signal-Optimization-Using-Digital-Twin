@@ -50,6 +50,17 @@ class TrafficSimulation:
         ], port=8813)
         self.sumo_started = True
 
+    def reload(self):
+        sumo_cfg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sumo_files", "sumo.sumocfg")
+        if self.sumo_started:
+            try:
+                traci.load(["-c", sumo_cfg, "--no-warnings", "--no-step-log", "--step-length", "0.08"])
+                return True
+            except Exception:
+                pass
+        self.start_sumo()
+        return True
+
     def update_signals(self, signals: dict, state_string: str):
         self.signals = signals
         

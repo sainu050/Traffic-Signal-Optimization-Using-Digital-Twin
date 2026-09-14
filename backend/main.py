@@ -505,6 +505,18 @@ def debug_simulation(db: Session = Depends(get_db)):
     except Exception as e:
         return {"status": "Error", "error": str(e)}
 
+@app.post("/api/simulation/reload")
+@app.get("/api/simulation/reload")
+def reload_simulation():
+    global sim
+    try:
+        if hasattr(sim, "reload"):
+            sim.reload()
+            return {"success": True, "message": "Simulation reloaded with new flows"}
+        return {"success": False, "message": "Simulation reload method not found"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @app.get("/api/citizens")
 def get_citizens(db: Session = Depends(get_db)):
     users = db.query(User).filter(User.role == "PUBLIC").order_by(User.user_id.desc()).all()
