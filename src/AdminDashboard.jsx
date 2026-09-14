@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import SimulationCanvas from './SimulationCanvas'
 import {
   Sliders, Route, Users, Activity, FileText, 
   Settings, Power, Bell, Shield, UserCheck, Info,
   Trash2, Plus, CheckCircle, AlertTriangle, RefreshCw,
   Search, Play, Pause, Database, Server, ChevronRight,
-  Clock, ToggleLeft, User, Eye, Lock, Mail
+  Clock, ToggleLeft, User, Eye, Lock, Mail, ArrowRight, UserPlus
 } from 'lucide-react'
 
 // Initial Mock Data
@@ -87,6 +87,95 @@ export default function AdminDashboard({
   const [sumoSyncing, setSumoSyncing] = useState(false)
   const [sysTime, setSysTime] = useState(new Date().toLocaleTimeString())
 
+  // Admin Notification States
+  const [notifications, setNotifications] = useState([])
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0)
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false)
+  const knownNotifIdsRef = useRef(new Set())
+  const isInitialNotifFetch = useRef(true)
+
+  // Notification API Handlers
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/admin/notifications')
+      if (res.ok) {
+        const data = await res.json()
+        const notifs = data.notifications || []
+        setNotifications(notifs)
+        setUnreadNotifCount(data.unread_count || 0)
+
+        // Detect newly arrived unread offline notifications
+        notifs.forEach(n => {
+          if (!n.is_read && n.type === 'OPERATOR_OFFLINE') {
+            if (!knownNotifIdsRef.current.has(n.id)) {
+              knownNotifIdsRef.current.add(n.id)
+              if (!isInitialNotifFetch.current) {
+                addToast(`⚠️ Operator ${n.operator_name} went OFFLINE from ${n.intersection_name}! Please assign a replacement.`, 'warning')
+                // Refresh operator list so duty status updates immediately
+                fetch('http://localhost:8000/api/operators')
+                  .then(r => r.json())
+                  .then(dataOp => setOperators(dataOp))
+                  .catch(() => {})
+              }
+            }
+          }
+        })
+        isInitialNotifFetch.current = false
+      }
+    } catch (err) {
+      // Silently ignore background polling network errors
+    }
+  }
+
+  const handleMarkNotificationRead = async (id, e) => {
+    if (e) e.stopPropagation()
+    try {
+      const res = await fetch(`http://localhost:8000/api/admin/notifications/${id}/read`, {
+        method: 'PUT'
+      })
+      if (res.ok) {
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
+        setUnreadNotifCount(prev => Math.max(0, prev - 1))
+      }
+    } catch (err) {
+      console.error("Failed to mark notification as read:", err)
+    }
+  }
+
+  const handleMarkAllNotificationsRead = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/admin/notifications/read-all', {
+        method: 'PUT'
+      })
+      if (res.ok) {
+        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
+        setUnreadNotifCount(0)
+        addToast("All notifications marked as read.", "info")
+      }
+    } catch (err) {
+      console.error("Failed to mark all notifications read:", err)
+    }
+  }
+
+  const handleInitiateReplacement = (notif) => {
+    const targetInt = localIntersections.find(i => 
+      i.name.toLowerCase() === (notif.intersection_name || '').toLowerCase()
+    )
+    if (targetInt) {
+      setSelectedIntId(targetInt.id)
+    }
+    const availableOp = operators.find(o => 
+      (o.status === 'Online' || o.is_online) && o.name !== notif.operator_name
+    )
+    if (availableOp) {
+      setSelectedOpId(availableOp.id)
+    } else if (operators.length > 0) {
+      setSelectedOpId(operators[0].id)
+    }
+    setShowNotifDropdown(false)
+    setShowModal('assign')
+  }
+
   // Load active operational database resources on mount
   const fetchData = async () => {
     try {
@@ -139,6 +228,11 @@ export default function AdminDashboard({
 
   useEffect(() => {
     fetchData()
+    fetchNotifications()
+    const notifInterval = setInterval(() => {
+      fetchNotifications()
+    }, 4000)
+    return () => clearInterval(notifInterval)
   }, [])
 
   const handleMetricsUpdate = (metrics) => {
@@ -326,6 +420,7 @@ export default function AdminDashboard({
         logAction('Assigned Operator to Intersection', `${op.name} assigned to ${intersection.name}`)
         addToast(`Assigned ${op.name} to ${intersection.name}.`, 'success')
         setShowModal(null)
+        fetchNotifications()
       } else {
         addToast('Failed to update operator assignment.', 'error')
       }
@@ -572,23 +667,220 @@ export default function AdminDashboard({
 
           {/* Right Actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            {/* Notifications */}
-            <button style={{
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: '50%',
-              width: 38,
-              height: 38,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'rgba(255,255,255,0.7)',
-              cursor: 'pointer',
-              position: 'relative'
-            }} onClick={() => addToast('No new notifications.', 'info')}>
-              <Bell size={18} />
-              <span style={{ position: 'absolute', top: 2, right: 2, width: 8, height: 8, borderRadius: '50%', background: '#ef4444' }} />
-            </button>
+            {/* Notifications with Real-time Popover */}
+            <div style={{ position: 'relative' }}>
+              <button 
+                style={{
+                  background: showNotifDropdown ? 'rgba(6, 182, 212, 0.15)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${showNotifDropdown ? 'rgba(6, 182, 212, 0.4)' : 'rgba(255,255,255,0.08)'}`,
+                  borderRadius: '50%',
+                  width: 38,
+                  height: 38,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: showNotifDropdown ? '#06b6d4' : 'rgba(255,255,255,0.7)',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  transition: 'all 0.2s'
+                }} 
+                onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+                title="System Notifications & Operator Alerts"
+              >
+                <Bell size={18} />
+                {unreadNotifCount > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: -3,
+                    right: -3,
+                    minWidth: 18,
+                    height: 18,
+                    padding: '0 4px',
+                    borderRadius: 9,
+                    background: '#ef4444',
+                    color: 'white',
+                    fontSize: 10.5,
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 0 8px rgba(239, 68, 68, 0.6)'
+                  }}>
+                    {unreadNotifCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Notification Popover Dropdown */}
+              {showNotifDropdown && (
+                <>
+                  <div 
+                    onClick={() => setShowNotifDropdown(false)}
+                    style={{
+                      position: 'fixed',
+                      inset: 0,
+                      zIndex: 140
+                    }}
+                  />
+                  <div style={{
+                    position: 'absolute',
+                    top: 48,
+                    right: 0,
+                    width: 390,
+                    maxHeight: 520,
+                    background: '#0a1022',
+                    border: '1px solid rgba(6, 182, 212, 0.25)',
+                    borderRadius: 14,
+                    boxShadow: '0 20px 45px rgba(0,0,0,0.75), 0 0 20px rgba(6,182,212,0.1)',
+                    zIndex: 150,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden'
+                  }}>
+                    {/* Header */}
+                    <div style={{
+                      padding: '14px 18px',
+                      borderBottom: '1px solid rgba(255,255,255,0.06)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      background: 'rgba(15, 23, 42, 0.8)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Bell size={16} color="#06b6d4" />
+                        <span style={{ fontSize: 13.5, fontWeight: 700, color: 'white' }}>Notifications</span>
+                        {unreadNotifCount > 0 && (
+                          <span style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: '1px 7px',
+                            background: 'rgba(239, 68, 68, 0.2)',
+                            color: '#ef4444',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            borderRadius: 10
+                          }}>
+                            {unreadNotifCount} new
+                          </span>
+                        )}
+                      </div>
+                      {unreadNotifCount > 0 && (
+                        <button
+                          onClick={handleMarkAllNotificationsRead}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#06b6d4',
+                            fontSize: 11.5,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            padding: 0
+                          }}
+                        >
+                          Mark all read
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Notification List */}
+                    <div style={{
+                      overflowY: 'auto',
+                      maxHeight: 440,
+                      padding: '8px'
+                    }}>
+                      {notifications.length === 0 ? (
+                        <div style={{ padding: '36px 20px', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>
+                          <CheckCircle size={32} color="#10b981" style={{ margin: '0 auto 8px', display: 'block', opacity: 0.6 }} />
+                          All clear! No notifications.
+                        </div>
+                      ) : (
+                        notifications.map(notif => {
+                          const isOfflineAlert = notif.type === 'OPERATOR_OFFLINE'
+                          return (
+                            <div
+                              key={notif.id}
+                              style={{
+                                padding: '12px 14px',
+                                borderRadius: 10,
+                                marginBottom: 6,
+                                background: notif.is_read ? 'rgba(255,255,255,0.02)' : (isOfflineAlert ? 'rgba(245, 158, 11, 0.08)' : 'rgba(6, 182, 212, 0.08)'),
+                                border: `1px solid ${notif.is_read ? 'rgba(255,255,255,0.04)' : (isOfflineAlert ? 'rgba(245, 158, 11, 0.25)' : 'rgba(6, 182, 212, 0.25)')}`,
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                                <div style={{
+                                  padding: 6,
+                                  borderRadius: 8,
+                                  background: isOfflineAlert ? 'rgba(245, 158, 11, 0.15)' : 'rgba(6, 182, 212, 0.15)',
+                                  color: isOfflineAlert ? '#f59e0b' : '#06b6d4',
+                                  flexShrink: 0,
+                                  marginTop: 2
+                                }}>
+                                  {isOfflineAlert ? <AlertTriangle size={15} /> : <Info size={15} />}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: isOfflineAlert ? '#f59e0b' : 'white' }}>
+                                      {notif.title}
+                                    </span>
+                                    <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.35)', fontFamily: 'monospace' }}>
+                                      {new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', margin: '4px 0 8px', lineHeight: 1.4 }}>
+                                    {notif.message}
+                                  </p>
+
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                    {isOfflineAlert && (
+                                      <button
+                                        onClick={() => handleInitiateReplacement(notif)}
+                                        style={{
+                                          padding: '5px 12px',
+                                          borderRadius: 6,
+                                          background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                                          border: 'none',
+                                          color: '#0f172a',
+                                          fontSize: 11.5,
+                                          fontWeight: 800,
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: 6
+                                        }}
+                                      >
+                                        <UserCheck size={13} />
+                                        Assign Replacement
+                                      </button>
+                                    )}
+                                    {!notif.is_read && (
+                                      <button
+                                        onClick={(e) => handleMarkNotificationRead(notif.id, e)}
+                                        style={{
+                                          marginLeft: 'auto',
+                                          background: 'transparent',
+                                          border: 'none',
+                                          color: 'rgba(255,255,255,0.4)',
+                                          fontSize: 11,
+                                          cursor: 'pointer',
+                                          textDecoration: 'underline'
+                                        }}
+                                      >
+                                        Mark read
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
 
             {/* Admin Profile */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -988,15 +1280,16 @@ export default function AdminDashboard({
                                     }
                                     return o
                                   }))
-                                  logAction('Updated Operator Assigned Intersection', `${op.name} assigned to ${nextName}`)
-                                  addToast(`Updated assignment for ${op.name} to ${nextName}.`, 'success')
-                                } else {
-                                  addToast('Failed to update operator assignment in database.', 'error')
-                                }
-                              }).catch(() => {
-                                addToast('Server connection error.', 'error')
-                              })
-                            }}
+                                   logAction('Updated Operator Assigned Intersection', `${op.name} assigned to ${nextName}`)
+                                   addToast(`Updated assignment for ${op.name} to ${nextName}.`, 'success')
+                                   fetchNotifications()
+                                 } else {
+                                   addToast('Failed to update operator assignment in database.', 'error')
+                                 }
+                               }).catch(() => {
+                                 addToast('Server connection error.', 'error')
+                               })
+                             }}
                             style={{
                               background: 'rgba(5, 8, 22, 0.6)',
                               border: '1px solid rgba(6, 182, 212, 0.25)',
@@ -1015,47 +1308,105 @@ export default function AdminDashboard({
                           </select>
                         </td>
                         <td style={{ padding: '14px 16px', fontSize: 13 }}>
-                          <span style={{
-                            background: op.status === 'Online' ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.03)',
-                            border: `1px solid ${op.status === 'Online' ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.08)'}`,
-                            color: op.status === 'Online' ? '#22c55e' : 'rgba(255,255,255,0.4)',
-                            padding: '3px 10px',
-                            borderRadius: 100,
-                            fontSize: 11.5,
-                            fontWeight: 500
-                          }}>
-                            {op.status}
-                          </span>
+                          {op.status === 'Online' ? (
+                            <span style={{
+                              background: 'rgba(34,197,94,0.1)',
+                              border: '1px solid rgba(34,197,94,0.3)',
+                              color: '#22c55e',
+                              padding: '4px 10px',
+                              borderRadius: 100,
+                              fontSize: 11.5,
+                              fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6
+                            }}>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+                              Online
+                            </span>
+                          ) : (
+                            <span style={{
+                              background: (op.assignedIntersection && op.assignedIntersection !== 'Unassigned') ? 'rgba(245, 158, 11, 0.12)' : 'rgba(255,255,255,0.04)',
+                              border: `1px solid ${(op.assignedIntersection && op.assignedIntersection !== 'Unassigned') ? 'rgba(245, 158, 11, 0.35)' : 'rgba(255,255,255,0.08)'}`,
+                              color: (op.assignedIntersection && op.assignedIntersection !== 'Unassigned') ? '#f59e0b' : 'rgba(255,255,255,0.4)',
+                              padding: '4px 10px',
+                              borderRadius: 100,
+                              fontSize: 11.5,
+                              fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6
+                            }}>
+                              <span style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: '50%',
+                                background: (op.assignedIntersection && op.assignedIntersection !== 'Unassigned') ? '#f59e0b' : '#94a3b8',
+                                display: 'inline-block'
+                              }} />
+                              {(op.assignedIntersection && op.assignedIntersection !== 'Unassigned') ? 'Offline (Needs Replacement)' : 'Offline'}
+                            </span>
+                          )}
                         </td>
                         <td style={{ padding: '14px 16px' }}>
-                          <button
-                            style={{
-                              background: 'transparent',
-                              border: '1px solid rgba(239, 68, 68, 0.25)',
-                              color: '#ef4444',
-                              borderRadius: 8,
-                              padding: '5px 10px',
-                              fontSize: 12,
-                              cursor: 'pointer'
-                            }}
-                            onClick={async () => {
-                              try {
-                                const userId = op.db_id || parseInt(op.id.replace('OP-', ''));
-                                const res = await fetch(`http://localhost:8000/api/users/${userId}`, { method: 'DELETE' });
-                                if (res.ok) {
-                                  setOperators(prev => prev.filter(o => o.id !== op.id));
-                                  logAction('Deleted Operator Account', `${op.name} (${op.id})`);
-                                  addToast(`Operator ${op.name} deleted.`, 'info');
-                                } else {
-                                  addToast("Failed to delete operator from database.", "error");
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {op.status === 'Offline' && op.assignedIntersection && op.assignedIntersection !== 'Unassigned' && (
+                              <button
+                                style={{
+                                  background: 'rgba(245, 158, 11, 0.15)',
+                                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                                  color: '#f59e0b',
+                                  borderRadius: 8,
+                                  padding: '5px 10px',
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 4
+                                }}
+                                title="Assign replacement operator for this junction"
+                                onClick={() => {
+                                  const targetInt = localIntersections.find(i => i.name === op.assignedIntersection)
+                                  if (targetInt) setSelectedIntId(targetInt.id)
+                                  const availableOp = operators.find(o => o.status === 'Online' && o.id !== op.id)
+                                  if (availableOp) setSelectedOpId(availableOp.id)
+                                  setShowModal('assign')
+                                }}
+                              >
+                                <UserCheck size={13} />
+                                Replace
+                              </button>
+                            )}
+                            <button
+                              style={{
+                                background: 'transparent',
+                                border: '1px solid rgba(239, 68, 68, 0.25)',
+                                color: '#ef4444',
+                                borderRadius: 8,
+                                padding: '5px 10px',
+                                fontSize: 12,
+                                cursor: 'pointer'
+                              }}
+                              onClick={async () => {
+                                try {
+                                  const userId = op.db_id || parseInt(op.id.replace('OP-', ''));
+                                  const res = await fetch(`http://localhost:8000/api/users/${userId}`, { method: 'DELETE' });
+                                  if (res.ok) {
+                                    setOperators(prev => prev.filter(o => o.id !== op.id));
+                                    logAction('Deleted Operator Account', `${op.name} (${op.id})`);
+                                    addToast(`Operator ${op.name} deleted.`, 'info');
+                                  } else {
+                                    addToast("Failed to delete operator from database.", "error");
+                                  }
+                                } catch (err) {
+                                  addToast(`Error: ${err.message}`, "error");
                                 }
-                              } catch (err) {
-                                addToast(`Error: ${err.message}`, "error");
-                              }
-                            }}
-                          >
-                            Remove
-                          </button>
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1746,7 +2097,9 @@ export default function AdminDashboard({
                       style={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: 8, width: '100%' }}
                     >
                       {operators.map(o => (
-                        <option key={o.id} value={o.id}>{o.name} ({o.id})</option>
+                        <option key={o.id} value={o.id}>
+                          {o.name} ({o.id}) — {o.status === 'Online' ? '🟢 Online (Available)' : '⚪ Offline'}
+                        </option>
                       ))}
                     </select>
                   </div>
