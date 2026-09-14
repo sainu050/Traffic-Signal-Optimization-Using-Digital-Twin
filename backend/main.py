@@ -254,12 +254,13 @@ class ForgotPasswordResetRequest(BaseModel):
 
 @app.post("/api/users/change-password")
 def change_password(data: UserChangePasswordSchema, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == data.email).first()
+    clean_email = data.email.strip()
+    user = db.query(User).filter(User.email.ilike(clean_email)).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
+        raise HTTPException(status_code=404, detail="User account not found.")
         
     if not bcrypt.checkpw(data.current_password.encode('utf-8'), user.password.encode('utf-8')):
-        raise HTTPException(status_code=400, detail="Incorrect current password.")
+        raise HTTPException(status_code=400, detail="Incorrect temporary password.")
         
     salt = bcrypt.gensalt()
     hashed_password = bcrypt.hashpw(data.new_password.encode('utf-8'), salt).decode('utf-8')
@@ -269,11 +270,11 @@ def change_password(data: UserChangePasswordSchema, db: Session = Depends(get_db
     
     # Save other details if provided during reset
     if data.name:
-        user.name = data.name
+        user.name = data.name.strip()
     if data.phone is not None:
-        user.phone = data.phone
+        user.phone = data.phone.strip()
     if data.city is not None:
-        user.city = data.city
+        user.city = data.city.strip()
         
     db.commit()
     
@@ -1024,6 +1025,14 @@ async def startup_event():
             db.execute(text("ALTER TABLE users ADD COLUMN security_question VARCHAR(255)"))
             db.execute(text("ALTER TABLE users ADD COLUMN security_answer VARCHAR(255)"))
             db.commit()
+
+        # Enlarge phone and city columns so international numbers and full city names never truncate
+        try:
+            db.execute(text("ALTER TABLE users ALTER COLUMN phone TYPE VARCHAR(30)"))
+            db.execute(text("ALTER TABLE users ALTER COLUMN city TYPE VARCHAR(100)"))
+            db.commit()
+        except Exception:
+            db.rollback()
 
         # Backfill default question/answer for any records where it is NULL
         try:
