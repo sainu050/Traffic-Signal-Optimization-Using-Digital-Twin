@@ -22,11 +22,12 @@ class User(Base):
     name = Column(String(100), nullable=False)
     email = Column(String(100), unique=True, index=True, nullable=False)
     password = Column(String(255), nullable=False)
-    phone = Column(String(15), nullable=True)
-    city = Column(String(15), nullable=True)
+    phone = Column(String(30), nullable=True)
+    city = Column(String(100), nullable=True)
     role = Column(String(20), default="PUBLIC", nullable=False)
     status = Column(String(20), default="ACTIVE", nullable=False)
     is_first_login = Column(Boolean, default=True, nullable=False)
+    is_online = Column(Boolean, default=True, nullable=False)
     security_question = Column(String(255), nullable=True)
     security_answer = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
@@ -89,6 +90,18 @@ class AuditLog(Base):
     action = Column(String(255), nullable=False)
     target = Column(String(255), nullable=False)
 
+class AdminNotification(Base):
+    __tablename__ = "admin_notifications"
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(100), nullable=False)
+    message = Column(String(255), nullable=False)
+    type = Column(String(50), default="OPERATOR_OFFLINE")
+    operator_id = Column(Integer, nullable=True)
+    operator_name = Column(String(100), nullable=True)
+    intersection_name = Column(String(100), nullable=True)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
 # Auto generate tables if not loaded
 Base.metadata.create_all(bind=engine)
 
@@ -133,6 +146,9 @@ class OperatorCreate(BaseModel):
 
 class OperatorAssign(BaseModel):
     assignedIntersection: str
+
+class OperatorDutyStatusSchema(BaseModel):
+    is_online: bool
 
 class IncidentCreate(BaseModel):
     location: str
@@ -221,8 +237,11 @@ def login_user(login_data: UserLoginSchema, db: Session = Depends(get_db)):
             "id": user.user_id,
             "name": user.name,
             "email": user.email,
+            "phone": user.phone or "",
+            "city": user.city or "",
             "role": user.role.lower(),
             "is_first_login": user.is_first_login,
+            "is_online": getattr(user, 'is_online', True) if getattr(user, 'is_online', True) is not None else True,
             "avatar": "".join([part[0] for part in user.name.split()[:2]]).upper()
         }
     }
@@ -516,6 +535,11 @@ def get_operators(db: Session = Depends(get_db)):
             if junction:
                 assigned_name = junction.intersection_name
                 
+        is_on = getattr(u, 'is_online', True)
+        if is_on is None:
+            is_on = True
+        status_str = "Online" if (u.status == "ACTIVE" and is_on) else "Offline"
+
         results.append({
             "id": f"OP-{u.user_id}",
             "db_id": u.user_id,
@@ -523,9 +547,10 @@ def get_operators(db: Session = Depends(get_db)):
             "email": u.email,
             "phone": u.phone or "",
             "city": u.city or "",
-            "status": "Online" if u.status == "ACTIVE" else "Offline",
+            "status": status_str,
+            "is_online": is_on,
             "assignedIntersection": assigned_name,
-            "activeTime": "4h 12m" if u.status == "ACTIVE" else "0m"
+            "activeTime": "4h 12m" if status_str == "Online" else "0m"
         })
     return results
 
@@ -623,8 +648,118 @@ def assign_operator(id: int, data: OperatorAssign, db: Session = Depends(get_db)
                 intersection_id=junction.intersection_id
             )
             db.add(assign)
+            # Mark any pending offline replacement alerts for this intersection as resolved/read
+            db.query(AdminNotification).filter(
+                AdminNotification.intersection_name == junction.intersection_name,
+                AdminNotification.type == "OPERATOR_OFFLINE"
+            ).update({AdminNotification.is_read: True})
     db.commit()
     return {"success": True, "message": "Operator assignment updated."}
+
+@app.put("/api/operators/{id}/duty-status")
+def update_operator_duty_status(id: int, data: OperatorDutyStatusSchema, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.user_id == id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Operator not found")
+        
+    user.is_online = data.is_online
+    db.commit()
+    db.refresh(user)
+    
+    # Check if assigned to an intersection
+    assign = db.query(OperatorAssignment).filter(OperatorAssignment.operator_id == id).first()
+    assigned_name = "Unassigned"
+    if assign:
+        junction = db.query(Intersection).filter(Intersection.intersection_id == assign.intersection_id).first()
+        if junction:
+            assigned_name = junction.intersection_name
+            
+    now_str = datetime.datetime.now().strftime("%H:%M:%S")
+    
+    if not data.is_online:
+        # Create an admin notification
+        notif_msg = f"Operator {user.name} marked themselves OFFLINE from {assigned_name}. Replacement needed." if assigned_name != "Unassigned" else f"Operator {user.name} marked themselves OFFLINE."
+        notif = AdminNotification(
+            title="Operator Offline",
+            message=notif_msg,
+            type="OPERATOR_OFFLINE",
+            operator_id=user.user_id,
+            operator_name=user.name,
+            intersection_name=assigned_name,
+            is_read=False
+        )
+        db.add(notif)
+        
+        # Log to audit log
+        audit = AuditLog(
+            time=now_str,
+            user_name=f"{user.name} (Operator)",
+            action="Marked Duty Status OFFLINE",
+            target=f"Assigned Junction: {assigned_name}"
+        )
+        db.add(audit)
+        db.commit()
+    else:
+        audit = AuditLog(
+            time=now_str,
+            user_name=f"{user.name} (Operator)",
+            action="Marked Duty Status ONLINE",
+            target=f"Assigned Junction: {assigned_name}"
+        )
+        db.add(audit)
+        db.commit()
+        
+    return {
+        "success": True,
+        "is_online": user.is_online,
+        "message": f"Duty status updated to {'ONLINE' if user.is_online else 'OFFLINE'}.",
+        "user": {
+            "id": user.user_id,
+            "name": user.name,
+            "email": user.email,
+            "role": user.role.lower(),
+            "is_online": user.is_online,
+            "phone": user.phone or "",
+            "city": user.city or ""
+        }
+    }
+
+# ─── ADMIN NOTIFICATION ROUTES ───
+
+@app.get("/api/admin/notifications")
+def get_admin_notifications(db: Session = Depends(get_db)):
+    notifs = db.query(AdminNotification).order_by(AdminNotification.id.desc()).limit(30).all()
+    unread_count = db.query(AdminNotification).filter(AdminNotification.is_read == False).count()
+    return {
+        "notifications": [
+            {
+                "id": n.id,
+                "title": n.title,
+                "message": n.message,
+                "type": n.type,
+                "operator_id": n.operator_id,
+                "operator_name": n.operator_name,
+                "intersection_name": n.intersection_name,
+                "is_read": n.is_read,
+                "created_at": n.created_at.strftime("%Y-%m-%d %H:%M:%S") if n.created_at else ""
+            } for n in notifs
+        ],
+        "unread_count": unread_count
+    }
+
+@app.put("/api/admin/notifications/{id}/read")
+def mark_notification_read(id: int, db: Session = Depends(get_db)):
+    notif = db.query(AdminNotification).filter(AdminNotification.id == id).first()
+    if notif:
+        notif.is_read = True
+        db.commit()
+    return {"success": True}
+
+@app.put("/api/admin/notifications/read-all")
+def mark_all_notifications_read(db: Session = Depends(get_db)):
+    db.query(AdminNotification).update({AdminNotification.is_read: True})
+    db.commit()
+    return {"success": True}
 
 @app.delete("/api/users/{user_id}")
 def delete_user(user_id: int, db: Session = Depends(get_db)):
@@ -749,7 +884,7 @@ def run_simulation_thread():
     step_counter = 0
     
     while True:
-        time.sleep(0.05) # 20 FPS (every 50ms)
+        time.sleep(0.04) # 25 FPS (every 40ms)
         db = SessionLocal()
         try:
             # Read traffic light state from PostgreSQL dynamically
@@ -768,9 +903,9 @@ def run_simulation_thread():
                     else:
                         current_phase = "north_green"
                     
-                    # Decrement manual countdown every 20 steps (1s)
+                    # Decrement manual countdown every 25 steps (1s at 25 FPS)
                     step_counter += 1
-                    if step_counter >= 20:
+                    if step_counter >= 25:
                         step_counter = 0
                         if sig.green_time and sig.green_time > 0:
                             sig.green_time -= 1
@@ -794,9 +929,9 @@ def run_simulation_thread():
                         state_string = "rrrrrrrrGGGGrrrr"
                 else:
                     # --- AUTO MODE (RULE-BASED ADAPTIVE TRAFFIC CONTROL) ---
-                    # Decrement AUTO countdown every 20 steps (1s)
+                    # Decrement AUTO countdown every 25 steps (1s at 25 FPS)
                     step_counter += 1
-                    if step_counter >= 20:
+                    if step_counter >= 25:
                         step_counter = 0
                         timer_remaining -= 1
                         
@@ -1033,6 +1168,14 @@ async def startup_event():
             db.commit()
         except Exception:
             db.rollback()
+
+        # Ensure is_online column exists
+        try:
+            db.execute(text("SELECT is_online FROM users LIMIT 1"))
+        except Exception:
+            db.rollback()
+            db.execute(text("ALTER TABLE users ADD COLUMN is_online BOOLEAN DEFAULT TRUE"))
+            db.commit()
 
         # Backfill default question/answer for any records where it is NULL
         try:
