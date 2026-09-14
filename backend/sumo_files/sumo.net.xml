@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2026-08-16T22:30:30.447589+05:30 by Eclipse SUMO netconvert 1.27.1
+<!-- generated on 2026-09-14T22:39:32.302865+05:30 by Eclipse SUMO netconvert 1.27.1
 <netconvertConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/netconvertConfiguration.xsd">
 
     <input>
@@ -27,7 +27,7 @@
         <lane id=":C_0_0" index="0" speed="8.08" length="12.90" width="8.00" shape="296.00,312.00 295.50,308.50 294.00,306.00 291.50,304.50 288.00,304.00"/>
     </edge>
     <edge id=":C_1" function="internal">
-        <lane id=":C_1_0" index="0" speed="13.89" length="24.00" width="8.00" shape="296.00,312.00 296.00,288.00"/>
+        <lane id=":C_1_0" index="0" speed="20.00" length="24.00" width="8.00" shape="296.00,312.00 296.00,288.00"/>
     </edge>
     <edge id=":C_2" function="internal">
         <lane id=":C_2_0" index="0" speed="10.66" length="7.47" width="8.00" shape="296.00,312.00 297.44,306.32 298.38,305.02"/>
@@ -45,7 +45,7 @@
         <lane id=":C_4_0" index="0" speed="8.08" length="12.90" width="8.00" shape="312.00,304.00 308.50,304.50 306.00,306.00 304.50,308.50 304.00,312.00"/>
     </edge>
     <edge id=":C_5" function="internal">
-        <lane id=":C_5_0" index="0" speed="13.89" length="24.00" width="8.00" shape="312.00,304.00 288.00,304.00"/>
+        <lane id=":C_5_0" index="0" speed="20.00" length="24.00" width="8.00" shape="312.00,304.00 288.00,304.00"/>
     </edge>
     <edge id=":C_6" function="internal">
         <lane id=":C_6_0" index="0" speed="10.66" length="10.22" width="8.00" shape="312.00,304.00 306.32,302.56 302.79,300.00"/>
@@ -63,7 +63,7 @@
         <lane id=":C_8_0" index="0" speed="8.08" length="12.90" width="8.00" shape="304.00,288.00 304.50,291.50 306.00,294.00 308.50,295.50 312.00,296.00"/>
     </edge>
     <edge id=":C_9" function="internal">
-        <lane id=":C_9_0" index="0" speed="13.89" length="24.00" width="8.00" shape="304.00,288.00 304.00,312.00"/>
+        <lane id=":C_9_0" index="0" speed="20.00" length="24.00" width="8.00" shape="304.00,288.00 304.00,312.00"/>
     </edge>
     <edge id=":C_10" function="internal">
         <lane id=":C_10_0" index="0" speed="10.66" length="7.47" width="8.00" shape="304.00,288.00 302.56,293.68 301.62,294.98"/>
@@ -81,7 +81,7 @@
         <lane id=":C_12_0" index="0" speed="8.08" length="12.90" width="8.00" shape="288.00,296.00 291.50,295.50 294.00,294.00 295.50,291.50 296.00,288.00"/>
     </edge>
     <edge id=":C_13" function="internal">
-        <lane id=":C_13_0" index="0" speed="13.89" length="24.00" width="8.00" shape="288.00,296.00 312.00,296.00"/>
+        <lane id=":C_13_0" index="0" speed="20.00" length="24.00" width="8.00" shape="288.00,296.00 312.00,296.00"/>
     </edge>
     <edge id=":C_14" function="internal">
         <lane id=":C_14_0" index="0" speed="10.66" length="10.22" width="8.00" shape="288.00,296.00 293.68,297.44 297.21,300.00"/>
@@ -109,35 +109,35 @@
     </edge>
 
     <edge id="C2E" from="C" to="E" priority="-1">
-        <lane id="C2E_0" index="0" speed="13.89" length="188.00" width="8.00" shape="312.00,296.00 500.00,296.00"/>
+        <lane id="C2E_0" index="0" speed="20.00" length="188.00" width="8.00" shape="312.00,296.00 500.00,296.00"/>
     </edge>
     <edge id="C2N" from="C" to="N" priority="-1">
-        <lane id="C2N_0" index="0" speed="13.89" length="188.00" width="8.00" shape="304.00,312.00 304.00,500.00"/>
+        <lane id="C2N_0" index="0" speed="20.00" length="188.00" width="8.00" shape="304.00,312.00 304.00,500.00"/>
     </edge>
     <edge id="C2S" from="C" to="S" priority="-1">
-        <lane id="C2S_0" index="0" speed="13.89" length="188.00" width="8.00" shape="296.00,288.00 296.00,100.00"/>
+        <lane id="C2S_0" index="0" speed="20.00" length="188.00" width="8.00" shape="296.00,288.00 296.00,100.00"/>
     </edge>
     <edge id="C2W" from="C" to="W" priority="-1">
-        <lane id="C2W_0" index="0" speed="13.89" length="188.00" width="8.00" shape="288.00,304.00 100.00,304.00"/>
+        <lane id="C2W_0" index="0" speed="20.00" length="188.00" width="8.00" shape="288.00,304.00 100.00,304.00"/>
     </edge>
     <edge id="E2C" from="E" to="C" priority="-1">
-        <lane id="E2C_0" index="0" speed="13.89" length="188.00" width="8.00" shape="500.00,304.00 312.00,304.00"/>
+        <lane id="E2C_0" index="0" speed="20.00" length="188.00" width="8.00" shape="500.00,304.00 312.00,304.00"/>
     </edge>
     <edge id="N2C" from="N" to="C" priority="-1">
-        <lane id="N2C_0" index="0" speed="13.89" length="188.00" width="8.00" shape="296.00,500.00 296.00,312.00"/>
+        <lane id="N2C_0" index="0" speed="20.00" length="188.00" width="8.00" shape="296.00,500.00 296.00,312.00"/>
     </edge>
     <edge id="S2C" from="S" to="C" priority="-1">
-        <lane id="S2C_0" index="0" speed="13.89" length="188.00" width="8.00" shape="304.00,100.00 304.00,288.00"/>
+        <lane id="S2C_0" index="0" speed="20.00" length="188.00" width="8.00" shape="304.00,100.00 304.00,288.00"/>
     </edge>
     <edge id="W2C" from="W" to="C" priority="-1">
-        <lane id="W2C_0" index="0" speed="13.89" length="188.00" width="8.00" shape="100.00,296.00 288.00,296.00"/>
+        <lane id="W2C_0" index="0" speed="20.00" length="188.00" width="8.00" shape="100.00,296.00 288.00,296.00"/>
     </edge>
 
     <tlLogic id="C" type="static" programID="0" offset="0">
-        <phase duration="42" state="GGggrrrrGGggrrrr"/>
-        <phase duration="3"  state="yyyyrrrryyyyrrrr"/>
-        <phase duration="42" state="rrrrGGggrrrrGGgg"/>
-        <phase duration="3"  state="rrrryyyyrrrryyyy"/>
+        <phase duration="40" state="GGggrrrrGGggrrrr"/>
+        <phase duration="5"  state="yyyyrrrryyyyrrrr"/>
+        <phase duration="40" state="rrrrGGggrrrrGGgg"/>
+        <phase duration="5"  state="rrrryyyyrrrryyyy"/>
     </tlLogic>
 
     <junction id="C" type="traffic_light" x="300.00" y="300.00" incLanes="N2C_0 E2C_0 S2C_0 W2C_0" intLanes=":C_0_0 :C_1_0 :C_16_0 :C_17_0 :C_4_0 :C_5_0 :C_18_0 :C_19_0 :C_8_0 :C_9_0 :C_20_0 :C_21_0 :C_12_0 :C_13_0 :C_22_0 :C_23_0" shape="292.00,312.00 308.00,312.00 308.44,309.78 309.00,309.00 309.78,308.44 310.78,308.11 312.00,308.00 312.00,292.00 309.78,291.56 309.00,291.00 308.44,290.22 308.11,289.22 308.00,288.00 292.00,288.00 291.56,290.22 291.00,291.00 290.22,291.56 289.22,291.89 288.00,292.00 288.00,308.00 290.22,308.44 291.00,309.00 291.56,309.78 291.89,310.78">
