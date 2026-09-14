@@ -40,13 +40,13 @@ class TrafficSimulation:
             
         # Start SUMO in background via TraCI
         # --no-warnings suppresses console noise, --no-step-log disables step terminal logs
-        # --step-length 0.05 sets step duration to 50ms matching our background thread's 20 FPS loop
+        # --step-length 0.08 accelerates simulation speed to 1.6x - 2.0x real-time for smooth, responsive movement
         traci.start([
             sumo_binary, 
             "-c", sumo_cfg, 
             "--no-warnings", 
             "--no-step-log",
-            "--step-length", "0.05"
+            "--step-length", "0.08"
         ], port=8813)
         self.sumo_started = True
 
@@ -87,28 +87,52 @@ class TrafficSimulation:
             for veh_id in veh_ids:
                 x, y = traci.vehicle.getPosition(veh_id)
                 angle = traci.vehicle.getAngle(veh_id)
-                vtype = traci.vehicle.getTypeID(veh_id)
+                vtype = traci.vehicle.getTypeID(veh_id).lower()
                 wait = traci.vehicle.getWaitingTime(veh_id)
+                speed = traci.vehicle.getSpeed(veh_id)
                 total_wait += wait
                 
-                # Assign visual color and length based on type
-                color = "#3b82f6" # default car blue
-                size = 24
-                if "bus" in vtype:
-                    color = "#ef4444" # red
-                    size = 36
+                # Determine detailed vehicle profile
+                if "motorcycle" in vtype or "bike" in vtype:
+                    clean_type = "motorcycle"
+                    color = "#eab308" # Vibrant gold/yellow
+                    size = 14
+                elif "rickshaw" in vtype or "auto" in vtype:
+                    clean_type = "rickshaw"
+                    color = "#22c55e" # Green auto-rickshaw
+                    size = 18
+                elif "ambulance" in vtype:
+                    clean_type = "ambulance"
+                    color = "#ffffff" # Emergency white
+                    size = 28
+                elif "bus" in vtype:
+                    clean_type = "bus"
+                    color = "#ef4444" # Public transit red
+                    size = 40
                 elif "truck" in vtype:
-                    color = "#06b6d4" # cyan
-                    size = 42
+                    clean_type = "truck"
+                    color = "#f97316" # Heavy cargo orange
+                    size = 44
+                elif "suv" in vtype:
+                    clean_type = "suv"
+                    color = "#06b6d4" # Modern cyan
+                    size = 26
+                else:
+                    clean_type = "car"
+                    car_palette = ["#3b82f6", "#6366f1", "#8b5cf6", "#ec4899", "#14b8a6", "#38bdf8"]
+                    veh_hash = sum(ord(c) for c in veh_id)
+                    color = car_palette[veh_hash % len(car_palette)]
+                    size = 22
                 
                 vehicles.append({
                     "id": veh_id,
-                    "type": vtype,
+                    "type": clean_type,
                     "x": round(x, 2),
                     "y": round(y, 2),
                     "angle": angle,
                     "color": color,
                     "size": size,
+                    "speed": round(speed, 1),
                     "wait": wait
                 })
         except Exception:
