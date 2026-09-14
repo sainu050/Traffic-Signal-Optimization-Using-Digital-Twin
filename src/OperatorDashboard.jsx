@@ -29,12 +29,15 @@ export default function OperatorDashboard({
   const [profileName, setProfileName] = useState('')
   const [profilePhone, setProfilePhone] = useState('')
   const [profileCity, setProfileCity] = useState('')
+  const [isOnline, setIsOnline] = useState(currentUser?.is_online !== false)
+  const [isUpdatingDuty, setIsUpdatingDuty] = useState(false)
 
   useEffect(() => {
     if (currentUser) {
       setProfileName(currentUser.name || '')
       setProfilePhone(currentUser.phone || '')
       setProfileCity(currentUser.city || '')
+      setIsOnline(currentUser.is_online !== false)
     }
   }, [currentUser])
 
@@ -230,6 +233,48 @@ export default function OperatorDashboard({
     }
   }
 
+  const handleToggleDutyStatus = async (targetStatus) => {
+    const nextStatus = typeof targetStatus === 'boolean' ? targetStatus : !isOnline
+    const userId = currentUser?.id || currentUser?.user_id
+    if (!userId) {
+      addToast("Error: User session ID not found.", "error")
+      return
+    }
+
+    setIsUpdatingDuty(true)
+    try {
+      const res = await fetch(`http://localhost:8000/api/operators/${userId}/duty-status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_online: nextStatus })
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setIsOnline(nextStatus)
+        const updatedUser = { ...currentUser, is_online: nextStatus }
+        if (setCurrentUser) {
+          setCurrentUser(updatedUser)
+        }
+        localStorage.setItem('currentUser', JSON.stringify(updatedUser))
+        
+        if (nextStatus) {
+          addToast("Duty status: You are now ONLINE (Active on signal control).", "success")
+          logAction("Marked duty status ONLINE", "Traffic Signal Control")
+        } else {
+          addToast("Duty status: You are now OFFLINE. Admin alerted for replacement.", "warning")
+          logAction("Marked duty status OFFLINE", "Requested replacement")
+        }
+        fetchData()
+      } else {
+        addToast(data.detail || data.message || "Failed to update duty status.", "error")
+      }
+    } catch (err) {
+      addToast(`Connection error: ${err.message}`, "error")
+    } finally {
+      setIsUpdatingDuty(false)
+    }
+  }
+
   // Verify and resolve reported incidents
   const handleVerifyIncident = async (incidentId, newStatus) => {
     try {
@@ -405,14 +450,25 @@ export default function OperatorDashboard({
               alignItems: 'center',
               justifyContent: 'center',
               fontWeight: 700,
-              fontSize: 14
+              fontSize: 14,
+              position: 'relative'
             }}>
               {currentUser?.name ? currentUser.name.charAt(0) : 'O'}
+              <span style={{
+                position: 'absolute',
+                bottom: -1,
+                right: -1,
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                background: isOnline ? '#10b981' : '#f59e0b',
+                border: '2px solid #050816'
+              }} />
             </div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700 }}>{currentUser?.name || 'Traffic Operator'}</div>
-              <div style={{ fontSize: 11, color: '#8b5cf6', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                Traffic Controller <span style={{ fontSize: 9, color: '#38bdf8' }}>(Edit)</span>
+              <div style={{ fontSize: 11, color: isOnline ? '#10b981' : '#f59e0b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                ● {isOnline ? 'On Duty' : 'Off Duty'} <span style={{ fontSize: 9, color: '#38bdf8' }}>(Edit)</span>
               </div>
             </div>
           </div>
@@ -469,14 +525,72 @@ export default function OperatorDashboard({
             </p>
           </div>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
               <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>CONTROL STATION TIME</span>
               <span style={{ fontSize: 15, fontWeight: 700, color: '#06b6d4', fontFamily: 'monospace' }}>{sysTime}</span>
             </div>
+
+            {/* Interactive Duty Status Control */}
             <div style={{
-              background: 'rgba(16, 185, 129, 0.08)',
-              border: '1px solid rgba(16, 185, 129, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              background: isOnline ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)',
+              border: `1px solid ${isOnline ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.3)'}`,
+              borderRadius: 24,
+              padding: '4px 6px 4px 14px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <span style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: isOnline ? '#10b981' : '#f59e0b',
+                  boxShadow: isOnline ? '0 0 10px #10b981' : '0 0 8px #f59e0b',
+                  display: 'inline-block'
+                }} />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.5)', fontWeight: 600, letterSpacing: '0.05em' }}>
+                    DUTY STATUS
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: isOnline ? '#10b981' : '#f59e0b' }}>
+                    {isOnline ? 'ONLINE' : 'OFFLINE'}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => handleToggleDutyStatus(!isOnline)}
+                disabled={isUpdatingDuty}
+                title={isOnline ? "Mark yourself Offline (Admin will be notified to assign a replacement)" : "Mark yourself Online"}
+                style={{
+                  background: isOnline ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                  border: `1px solid ${isOnline ? 'rgba(239, 68, 68, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`,
+                  color: isOnline ? '#ef4444' : '#10b981',
+                  borderRadius: 18,
+                  padding: '5px 12px',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: isUpdatingDuty ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  transition: 'all 0.2s'
+                }}
+              >
+                {isUpdatingDuty ? (
+                  <RefreshCw size={12} className="animate-spin" />
+                ) : (
+                  <Power size={12} />
+                )}
+                {isOnline ? 'Go Offline' : 'Go Online'}
+              </button>
+            </div>
+
+            <div style={{
+              background: 'rgba(6, 182, 212, 0.08)',
+              border: '1px solid rgba(6, 182, 212, 0.2)',
               borderRadius: 20,
               padding: '6px 14px',
               display: 'flex',
@@ -484,9 +598,9 @@ export default function OperatorDashboard({
               gap: 8,
               fontSize: 12,
               fontWeight: 700,
-              color: '#10b981'
+              color: '#06b6d4'
             }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#06b6d4', display: 'inline-block' }} />
               Live Telemetry Online
             </div>
           </div>
@@ -917,6 +1031,48 @@ export default function OperatorDashboard({
                   placeholder="e.g. Kochi"
                   required
                 />
+              </div>
+
+              {/* Operational Duty Status Control Card */}
+              <div style={{
+                padding: '14px',
+                background: isOnline ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)',
+                border: `1px solid ${isOnline ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.3)'}`,
+                borderRadius: 10,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 12
+              }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'white', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: isOnline ? '#10b981' : '#f59e0b' }} />
+                    Duty Status: <span style={{ color: isOnline ? '#10b981' : '#f59e0b' }}>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 3 }}>
+                    {isOnline 
+                      ? 'You are active for signal control. Toggling off alerts the admin.' 
+                      : 'You are marked offline. An admin has been notified for replacement.'}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleToggleDutyStatus(!isOnline)}
+                  disabled={isUpdatingDuty}
+                  style={{
+                    padding: '7px 14px',
+                    borderRadius: 8,
+                    background: isOnline ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                    border: `1px solid ${isOnline ? 'rgba(239, 68, 68, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`,
+                    color: isOnline ? '#ef4444' : '#10b981',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: isUpdatingDuty ? 'wait' : 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {isUpdatingDuty ? 'Updating...' : (isOnline ? 'Go Offline' : 'Go Online')}
+                </button>
               </div>
               
               <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
