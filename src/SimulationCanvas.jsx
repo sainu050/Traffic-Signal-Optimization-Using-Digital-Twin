@@ -288,105 +288,410 @@ export default function SimulationCanvas({ onMetricsUpdate }) {
     drawLaneCountBadge(180, 375, westCount)
     drawLaneCountBadge(420, 225, eastCount)
 
-    // 6. Draw Simulated Vehicles
+    // 6. Draw Simulated Vehicles (Multi-Vehicle Rendering: Car, Motorcycle, Auto-Rickshaw, SUV, Bus, Truck, Ambulance)
     simulationState.vehicles.forEach((veh) => {
       ctx.save()
       const scale = 5.0
       let canvasX = 300 + (veh.x - 300) * scale
       let canvasY = 300 - (veh.y - 300) * scale
 
-
-
       ctx.translate(canvasX, canvasY)
       ctx.rotate((veh.angle * Math.PI) / 180)
 
-      // Draw detailed top-down vehicle sprite
-      const w = 15 // vehicle width
-      const h = veh.size // vehicle length (determines type)
-      
-      // 1. Tires (4 black rectangles offset from body)
-      ctx.fillStyle = '#0a0a0c'
-      const tireW = 3.5
-      const tireH = 7
-      // Front-left
-      ctx.fillRect(-w/2 - tireW + 1, -h/2 + 3, tireW, tireH)
-      // Front-right
-      ctx.fillRect(w/2 - 1, -h/2 + 3, tireW, tireH)
-      // Rear-left
-      ctx.fillRect(-w/2 - tireW + 1, h/2 - 10, tireW, tireH)
-      // Rear-right
-      ctx.fillRect(w/2 - 1, h/2 - 10, tireW, tireH)
+      const vType = veh.type || 'car'
+      const vColor = veh.color || '#3b82f6'
 
-      // 2. Headlight beams (Glowing yellow cones pointing forward)
-      ctx.save()
-      ctx.shadowBlur = 10
-      ctx.shadowColor = 'rgba(253, 224, 71, 0.6)'
-      ctx.fillStyle = 'rgba(253, 224, 71, 0.25)'
-      ctx.beginPath()
-      // Left headlight beam
-      ctx.moveTo(-w/4, -h/2)
-      ctx.lineTo(-w/2 - 8, -h/2 - 18)
-      ctx.lineTo(0, -h/2 - 18)
-      ctx.fill()
-      ctx.beginPath()
-      // Right headlight beam
-      ctx.moveTo(w/4, -h/2)
-      ctx.lineTo(w/2 + 8, -h/2 - 18)
-      ctx.lineTo(0, -h/2 - 18)
-      ctx.fill()
-      ctx.restore()
+      if (vType === 'motorcycle') {
+        // --- 1. MOTORCYCLE / BIKE ---
+        const w = 7
+        const h = 16
 
-      // 3. Side Mirrors (Body color matching wings)
-      ctx.fillStyle = veh.color
-      ctx.fillRect(-w/2 - 2, -h/2 + 6, 2.5, 2)
-      ctx.fillRect(w/2 - 0.5, -h/2 + 6, 2.5, 2)
+        // Wheels (Front & Rear on center axis)
+        ctx.fillStyle = '#0a0a0c'
+        ctx.fillRect(-1.5, -h/2, 3, 5)
+        ctx.fillRect(-1.5, h/2 - 5, 3, 5)
 
-      // 4. Main Body Paint
-      ctx.fillStyle = veh.color
-      ctx.beginPath()
-      ctx.roundRect(-w / 2, -h / 2, w, h, 3.5)
-      ctx.fill()
-      
-      // 5. Windows and Glass cabin
-      ctx.fillStyle = '#1e293b' // Dark tint glass
-      // Front windshield
-      ctx.beginPath()
-      ctx.roundRect(-w/2 + 1.5, -h/2 + 4, w - 3, 5, 1.5)
-      ctx.fill()
-      
-      // Windshield light reflection sheen
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.25)'
-      ctx.fillRect(-w/2 + 3, -h/2 + 5, 3, 2)
+        // Handlebars
+        ctx.fillStyle = '#475569'
+        ctx.fillRect(-w/2 - 2, -h/2 + 4, w + 4, 1.5)
 
-      // Side/Rear cabin windows
-      ctx.fillStyle = '#1e293b'
-      const cabinLength = h * 0.45
-      ctx.beginPath()
-      ctx.roundRect(-w/2 + 1.5, -h/2 + 11, w - 3, cabinLength, 1.5)
-      ctx.fill()
-      
-      // Rear windshield
-      ctx.beginPath()
-      ctx.roundRect(-w/2 + 2, -h/2 + 12 + cabinLength, w - 4, 3, 1)
-      ctx.fill()
+        // Bike Body / Tank
+        ctx.fillStyle = vColor
+        ctx.beginPath()
+        ctx.roundRect(-2.5, -h/2 + 2, 5, 9, 2)
+        ctx.fill()
 
-      // 6. Tail lights (Red glowing stripes at rear corners)
-      ctx.fillStyle = '#ef4444'
-      ctx.fillRect(-w/2 + 1, h/2 - 2, 3, 1.5)
-      ctx.fillRect(w/2 - 4, h/2 - 2, 3, 1.5)
+        // Rider Body (Leather jacket)
+        ctx.fillStyle = '#1e293b'
+        ctx.beginPath()
+        ctx.arc(0, 0, 3.5, 0, 2 * Math.PI)
+        ctx.fill()
+
+        // Helmet with Visor
+        ctx.fillStyle = '#0f172a'
+        ctx.beginPath()
+        ctx.arc(0, -2, 2.8, 0, 2 * Math.PI)
+        ctx.fill()
+
+        // Visor reflection
+        ctx.fillStyle = '#38bdf8'
+        ctx.fillRect(-1.5, -4.5, 3, 1)
+
+        // Headlight beam
+        ctx.save()
+        ctx.shadowBlur = 8
+        ctx.shadowColor = 'rgba(253, 224, 71, 0.7)'
+        ctx.fillStyle = 'rgba(253, 224, 71, 0.3)'
+        ctx.beginPath()
+        ctx.moveTo(0, -h/2)
+        ctx.lineTo(-4, -h/2 - 14)
+        ctx.lineTo(4, -h/2 - 14)
+        ctx.fill()
+        ctx.restore()
+
+        // Tail light
+        ctx.fillStyle = '#ef4444'
+        ctx.fillRect(-1.5, h/2 - 1, 3, 1.5)
+
+      } else if (vType === 'rickshaw') {
+        // --- 2. AUTO-RICKSHAW ---
+        const w = 13
+        const h = 19
+
+        // 3 Wheels (1 front, 2 rear)
+        ctx.fillStyle = '#0a0a0c'
+        ctx.fillRect(-1.5, -h/2, 3, 4)
+        ctx.fillRect(-w/2 - 2, h/2 - 5, 2.5, 5)
+        ctx.fillRect(w/2 - 0.5, h/2 - 5, 2.5, 5)
+
+        // Front cowl (Dark hood)
+        ctx.fillStyle = '#0f172a'
+        ctx.beginPath()
+        ctx.moveTo(0, -h/2 + 1)
+        ctx.lineTo(-w/2 + 1, -h/2 + 7)
+        ctx.lineTo(w/2 - 1, -h/2 + 7)
+        ctx.fill()
+
+        // Windshield
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.5)'
+        ctx.fillRect(-w/2 + 2, -h/2 + 5, w - 4, 2)
+
+        // Yellow/Green Canopy Roof
+        ctx.fillStyle = vColor
+        ctx.beginPath()
+        ctx.roundRect(-w/2, -h/2 + 6, w, h - 8, 3)
+        ctx.fill()
+
+        // Roof Accent Stripe
+        ctx.fillStyle = '#facc15'
+        ctx.fillRect(-w/4, -h/2 + 7, w/2, h - 10)
+
+        // Headlight
+        ctx.fillStyle = '#fde047'
+        ctx.fillRect(-1.5, -h/2, 3, 1.5)
+
+        // Tail lights
+        ctx.fillStyle = '#ef4444'
+        ctx.fillRect(-w/2 + 1, h/2 - 3, 2, 1.5)
+        ctx.fillRect(w/2 - 3, h/2 - 3, 2, 1.5)
+
+      } else if (vType === 'bus') {
+        // --- 3. TRANSIT BUS ---
+        const w = 17
+        const h = 42
+
+        // 6 Heavy-duty Wheels
+        ctx.fillStyle = '#0a0a0c'
+        const tw = 3.5
+        const th = 7
+        ctx.fillRect(-w/2 - tw + 1, -h/2 + 4, tw, th)
+        ctx.fillRect(w/2 - 1, -h/2 + 4, tw, th)
+        ctx.fillRect(-w/2 - tw + 1, h/2 - 18, tw, th)
+        ctx.fillRect(w/2 - 1, h/2 - 18, tw, th)
+        ctx.fillRect(-w/2 - tw + 1, h/2 - 9, tw, th)
+        ctx.fillRect(w/2 - 1, h/2 - 9, tw, th)
+
+        // Main Bus Body
+        ctx.fillStyle = vColor
+        ctx.beginPath()
+        ctx.roundRect(-w/2, -h/2, w, h, 4)
+        ctx.fill()
+
+        // Front Destination Display Screen (Amber LED)
+        ctx.fillStyle = '#f59e0b'
+        ctx.fillRect(-w/2 + 2.5, -h/2 + 1.5, w - 5, 2)
+
+        // Panoramic Front Windshield
+        ctx.fillStyle = '#0f172a'
+        ctx.fillRect(-w/2 + 2, -h/2 + 4, w - 4, 4.5)
+
+        // Passenger Side Windows (Rows of glass panes)
+        ctx.fillStyle = '#1e293b'
+        for (let i = 0; i < 4; i++) {
+          const winY = -h/2 + 11 + i * 6.5
+          ctx.fillRect(-w/2 + 1.5, winY, 3, 4.5)
+          ctx.fillRect(w/2 - 4.5, winY, 3, 4.5)
+        }
+
+        // Roof Air Conditioning Unit
+        ctx.fillStyle = '#f1f5f9'
+        ctx.beginPath()
+        ctx.roundRect(-w/3, -4, (w*2)/3, 14, 2)
+        ctx.fill()
+
+        // Headlights
+        ctx.fillStyle = '#fde047'
+        ctx.fillRect(-w/2 + 2, -h/2, 3, 1.5)
+        ctx.fillRect(w/2 - 5, -h/2, 3, 1.5)
+
+        // Tail lights
+        ctx.fillStyle = '#ef4444'
+        ctx.fillRect(-w/2 + 1, h/2 - 2, 3.5, 2)
+        ctx.fillRect(w/2 - 4.5, h/2 - 2, 3.5, 2)
+
+      } else if (vType === 'truck') {
+        // --- 4. CARGO TRUCK ---
+        const w = 18
+        const h = 46
+
+        // Wheels
+        ctx.fillStyle = '#0a0a0c'
+        const tw = 3.5
+        const th = 7.5
+        ctx.fillRect(-w/2 - tw + 1, -h/2 + 4, tw, th)
+        ctx.fillRect(w/2 - 1, -h/2 + 4, tw, th)
+        ctx.fillRect(-w/2 - tw + 1, h/2 - 16, tw, th)
+        ctx.fillRect(w/2 - 1, h/2 - 16, tw, th)
+        ctx.fillRect(-w/2 - tw + 1, h/2 - 8, tw, th)
+        ctx.fillRect(w/2 - 1, h/2 - 8, tw, th)
+
+        // Tractor Cab (Front)
+        ctx.fillStyle = vColor
+        ctx.beginPath()
+        ctx.roundRect(-w/2, -h/2, w, 13, 3)
+        ctx.fill()
+
+        // Cab Windshield
+        ctx.fillStyle = '#0f172a'
+        ctx.fillRect(-w/2 + 2, -h/2 + 3, w - 4, 3.5)
+
+        // Chrome bumper
+        ctx.fillStyle = '#94a3b8'
+        ctx.fillRect(-w/2 + 3, -h/2, w - 6, 1.5)
+
+        // Cargo Flatbed / Container (Rear)
+        ctx.fillStyle = '#334155'
+        ctx.beginPath()
+        ctx.roundRect(-w/2 + 0.5, -h/2 + 15, w - 1, 30, 2)
+        ctx.fill()
+
+        // Container Ribs
+        ctx.strokeStyle = '#475569'
+        ctx.lineWidth = 1
+        for (let y = -h/2 + 18; y < h/2 - 3; y += 4) {
+          ctx.beginPath()
+          ctx.moveTo(-w/2 + 2, y)
+          ctx.lineTo(w/2 - 2, y)
+          ctx.stroke()
+        }
+
+        // Headlights
+        ctx.fillStyle = '#fde047'
+        ctx.fillRect(-w/2 + 1, -h/2, 2.5, 1.5)
+        ctx.fillRect(w/2 - 3.5, -h/2, 2.5, 1.5)
+
+        // Tail lights
+        ctx.fillStyle = '#ef4444'
+        ctx.fillRect(-w/2 + 1, h/2 - 2, 4, 2)
+        ctx.fillRect(w/2 - 5, h/2 - 2, 4, 2)
+
+      } else if (vType === 'ambulance') {
+        // --- 5. EMERGENCY AMBULANCE ---
+        const w = 15
+        const h = 28
+
+        // Tires
+        ctx.fillStyle = '#0a0a0c'
+        ctx.fillRect(-w/2 - 2.5, -h/2 + 3, 3, 6)
+        ctx.fillRect(w/2 - 0.5, -h/2 + 3, 3, 6)
+        ctx.fillRect(-w/2 - 2.5, h/2 - 9, 3, 6)
+        ctx.fillRect(w/2 - 0.5, h/2 - 9, 3, 6)
+
+        // White Van Body
+        ctx.fillStyle = '#f8fafc'
+        ctx.beginPath()
+        ctx.roundRect(-w/2, -h/2, w, h, 3.5)
+        ctx.fill()
+
+        // Red Side Stripes
+        ctx.fillStyle = '#ef4444'
+        ctx.fillRect(-w/2, -h/2 + 8, 1.5, h - 12)
+        ctx.fillRect(w/2 - 1.5, -h/2 + 8, 1.5, h - 12)
+
+        // Windshield
+        ctx.fillStyle = '#0f172a'
+        ctx.fillRect(-w/2 + 1.5, -h/2 + 3.5, w - 3, 4)
+
+        // Red Cross on Roof
+        ctx.fillStyle = '#ef4444'
+        ctx.fillRect(-4, 0, 8, 2.5)
+        ctx.fillRect(-1.25, -2.75, 2.5, 8)
+
+        // Alternating Flashing Emergency Strobe (Red / Blue)
+        const strobe = Math.floor(Date.now() / 120) % 2 === 0
+        ctx.save()
+        ctx.shadowBlur = 14
+        ctx.shadowColor = strobe ? '#ef4444' : '#3b82f6'
+        ctx.fillStyle = strobe ? '#ef4444' : '#3b82f6'
+        ctx.beginPath()
+        ctx.arc(strobe ? -3 : 3, -h/2 + 9, 2.5, 0, 2 * Math.PI)
+        ctx.fill()
+        ctx.restore()
+
+        // Headlights
+        ctx.fillStyle = '#fde047'
+        ctx.fillRect(-w/2 + 1.5, -h/2, 2.5, 1.5)
+        ctx.fillRect(w/2 - 4, -h/2, 2.5, 1.5)
+
+      } else if (vType === 'suv') {
+        // --- 6. SUV ---
+        const w = 15.5
+        const h = 26
+
+        // 4 Wide Tires
+        ctx.fillStyle = '#0a0a0c'
+        ctx.fillRect(-w/2 - 2.5, -h/2 + 3, 3, 6.5)
+        ctx.fillRect(w/2 - 0.5, -h/2 + 3, 3, 6.5)
+        ctx.fillRect(-w/2 - 2.5, h/2 - 9.5, 3, 6.5)
+        ctx.fillRect(w/2 - 0.5, h/2 - 9.5, 3, 6.5)
+
+        // Main Body
+        ctx.fillStyle = vColor
+        ctx.beginPath()
+        ctx.roundRect(-w/2, -h/2, w, h, 4)
+        ctx.fill()
+
+        // Front Windshield
+        ctx.fillStyle = '#0f172a'
+        ctx.fillRect(-w/2 + 1.5, -h/2 + 4, w - 3, 4.5)
+
+        // Panoramic Sunroof
+        ctx.fillStyle = '#1e293b'
+        ctx.fillRect(-w/2 + 2.5, -h/2 + 10, w - 5, 8)
+
+        // Twin Silver Roof Rack Rails
+        ctx.fillStyle = '#cbd5e1'
+        ctx.fillRect(-w/2 + 2, -h/2 + 9, 1.5, 11)
+        ctx.fillRect(w/2 - 3.5, -h/2 + 9, 1.5, 11)
+
+        // Rear Glass
+        ctx.fillStyle = '#0f172a'
+        ctx.fillRect(-w/2 + 2, h/2 - 4.5, w - 4, 2)
+
+        // Headlights
+        ctx.fillStyle = '#fde047'
+        ctx.fillRect(-w/2 + 1.5, -h/2, 2.5, 1.5)
+        ctx.fillRect(w/2 - 4, -h/2, 2.5, 1.5)
+
+        // Tail lights
+        ctx.fillStyle = '#ef4444'
+        ctx.fillRect(-w/2 + 1, h/2 - 2, 3, 1.5)
+        ctx.fillRect(w/2 - 4, h/2 - 2, 3, 1.5)
+
+      } else {
+        // --- 7. STANDARD CAR / SEDAN ---
+        const w = 14
+        const h = veh.size || 22
+
+        // Tires
+        ctx.fillStyle = '#0a0a0c'
+        const tireW = 3
+        const tireH = 6.5
+        ctx.fillRect(-w/2 - tireW + 1, -h/2 + 3, tireW, tireH)
+        ctx.fillRect(w/2 - 1, -h/2 + 3, tireW, tireH)
+        ctx.fillRect(-w/2 - tireW + 1, h/2 - 9.5, tireW, tireH)
+        ctx.fillRect(w/2 - 1, h/2 - 9.5, tireW, tireH)
+
+        // Headlight beams
+        ctx.save()
+        ctx.shadowBlur = 10
+        ctx.shadowColor = 'rgba(253, 224, 71, 0.6)'
+        ctx.fillStyle = 'rgba(253, 224, 71, 0.25)'
+        ctx.beginPath()
+        ctx.moveTo(-w/4, -h/2)
+        ctx.lineTo(-w/2 - 8, -h/2 - 18)
+        ctx.lineTo(0, -h/2 - 18)
+        ctx.fill()
+        ctx.beginPath()
+        ctx.moveTo(w/4, -h/2)
+        ctx.lineTo(w/2 + 8, -h/2 - 18)
+        ctx.lineTo(0, -h/2 - 18)
+        ctx.fill()
+        ctx.restore()
+
+        // Side Mirrors
+        ctx.fillStyle = vColor
+        ctx.fillRect(-w/2 - 2, -h/2 + 5, 2.5, 2)
+        ctx.fillRect(w/2 - 0.5, -h/2 + 5, 2.5, 2)
+
+        // Main Body Paint
+        ctx.fillStyle = vColor
+        ctx.beginPath()
+        ctx.roundRect(-w/2, -h/2, w, h, 3.5)
+        ctx.fill()
+
+        // Front Windshield
+        ctx.fillStyle = '#1e293b'
+        ctx.beginPath()
+        ctx.roundRect(-w/2 + 1.5, -h/2 + 3.5, w - 3, 4.5, 1.5)
+        ctx.fill()
+
+        // Windshield light sheen
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
+        ctx.fillRect(-w/2 + 3, -h/2 + 4.5, 3, 1.5)
+
+        // Cabin Roof & Rear Glass
+        const cabinLength = h * 0.45
+        ctx.fillStyle = '#1e293b'
+        ctx.beginPath()
+        ctx.roundRect(-w/2 + 1.5, -h/2 + 9.5, w - 3, cabinLength, 1.5)
+        ctx.fill()
+
+        ctx.beginPath()
+        ctx.roundRect(-w/2 + 2, -h/2 + 10.5 + cabinLength, w - 4, 2.5, 1)
+        ctx.fill()
+
+        // Tail lights
+        ctx.fillStyle = '#ef4444'
+        ctx.fillRect(-w/2 + 1, h/2 - 2, 2.5, 1.5)
+        ctx.fillRect(w/2 - 3.5, h/2 - 2, 2.5, 1.5)
+      }
 
       ctx.restore()
     })
 
-    // 7. Connection indicator dot
+    // 7. Status & Active Fleet Mix Legend
     ctx.fillStyle = isConnected ? '#10b981' : '#ef4444'
     ctx.beginPath()
     ctx.arc(20, 20, 5, 0, 2 * Math.PI)
     ctx.fill()
-    
-    ctx.fillStyle = 'rgba(255,255,255,0.4)'
-    ctx.font = '10px monospace'
-    ctx.fillText(isConnected ? 'LIVE SUMO TWIN' : 'DISCONNECTED', 30, 23)
+
+    ctx.fillStyle = 'rgba(255,255,255,0.75)'
+    ctx.font = 'bold 10px monospace'
+    ctx.fillText(isConnected ? 'LIVE SUMO TWIN (SPEED: 2X)' : 'DISCONNECTED', 32, 23)
+
+    // Vehicle Types Legend banner
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)'
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.roundRect(14, 568, 572, 20, 5)
+    ctx.fill()
+    ctx.stroke()
+
+    ctx.font = '9.5px sans-serif'
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)'
+    ctx.fillText('Fleet: 🚗 Cars • 🏍️ Bikes • 🛺 Auto-Rickshaws • 🚙 SUVs • 🚌 Buses • 🚛 Cargo Trucks • 🚑 Ambulances', 22, 582)
 
   }, [simulationState, isConnected])
 
