@@ -43,6 +43,7 @@ export default function App() {
   });
   const [loginRole, setLoginRole] = useState('public');
   const [loginEmail, setLoginEmail] = useState('');
+  const [loginEmailTouched, setLoginEmailTouched] = useState(false);
   const [loginPassword, setLoginPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
@@ -59,9 +60,11 @@ export default function App() {
   const [regFName, setRegFName] = useState('');
   const [regLName, setRegLName] = useState('');
   const [regEmail, setRegEmail] = useState('');
+  const [regEmailTouched, setRegEmailTouched] = useState(false);
   const [regPassword, setRegPassword] = useState('');
   const [regConfirm, setRegConfirm] = useState('');
   const [regPhone, setRegPhone] = useState('');
+  const [regPhoneTouched, setRegPhoneTouched] = useState(false);
   const [regCity, setRegCity] = useState('');
   const [regSecurityQuestion, setRegSecurityQuestion] = useState('What was the name of your first pet?');
   const [regSecurityAnswer, setRegSecurityAnswer] = useState('');
@@ -80,7 +83,10 @@ export default function App() {
   const [showFirstLoginConfirm, setShowFirstLoginConfirm] = useState(false);
   const [firstLoginName, setFirstLoginName] = useState('');
   const [firstLoginPhone, setFirstLoginPhone] = useState('');
+  const [firstLoginPhoneTouched, setFirstLoginPhoneTouched] = useState(false);
   const [firstLoginCity, setFirstLoginCity] = useState('');
+  const [firstLoginLoading, setFirstLoginLoading] = useState(false);
+  const [firstLoginError, setFirstLoginError] = useState('');
 
   useEffect(() => {
     if (currentUser) {
@@ -193,12 +199,51 @@ export default function App() {
     return 'congestion-high';
   };
 
+  const isValidEmail = (email) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
+  };
+
+  const isValidPhone = (phone) => {
+    if (!phone) return false;
+    const trimmed = phone.trim();
+    if (!trimmed.startsWith('+')) return false;
+    const cleaned = trimmed.replace(/[\s-]/g, '');
+    return /^\+[1-9]\d{0,2}\d{10}$/.test(cleaned);
+  };
+
+  const getPhoneValidationMessage = (phone) => {
+    if (!phone || phone.trim() === '') return '';
+    const trimmed = phone.trim();
+    if (!trimmed.startsWith('+')) {
+      return "Include '+' and country code (e.g. +91 9876543210)";
+    }
+    const cleaned = trimmed.replace(/[\s-]/g, '');
+    const digits = cleaned.slice(1);
+    if (!/^\d+$/.test(digits)) {
+      return "Only digits allowed after '+'";
+    }
+    if (digits.length < 11) {
+      const remaining = 10 - Math.max(0, digits.length - 2);
+      return `Enter country code & 10-digit number (${remaining > 0 ? remaining + ' digits remaining' : 'incomplete'})`;
+    }
+    if (!/^\+[1-9]\d{0,2}\d{10}$/.test(cleaned)) {
+      return "Invalid format. Enter country code (1-3 digits) & 10-digit mobile number";
+    }
+    return "✓ Valid mobile number";
+  };
+
   const handleRoleTabChange = (role) => {
     setLoginRole(role);
+    setLoginEmailTouched(false);
   };
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
+    setLoginEmailTouched(true);
+    if (!isValidEmail(loginEmail)) {
+      addToast('Please enter a valid email address.', 'error');
+      return;
+    }
     addToast('Authenticating...', 'info');
 
     try {
@@ -234,31 +279,71 @@ export default function App() {
 
   const handleFirstLoginPasswordReset = (e) => {
     e.preventDefault();
-    if (firstLoginNewPwd !== firstLoginConfirmPwd) {
-      addToast('New passwords do not match.', 'error');
+    setFirstLoginError('');
+
+    if (!firstLoginName || !firstLoginName.trim()) {
+      setFirstLoginError('Please enter your full name.');
+      addToast('Please enter your full name.', 'error');
       return;
     }
+
+    if (!firstLoginPhone || !isValidPhone(firstLoginPhone)) {
+      setFirstLoginPhoneTouched(true);
+      setFirstLoginError('Please enter a valid mobile number with country code and 10 digits (e.g. +91 9876543210).');
+      addToast('Please enter a valid mobile number with country code and 10 digits.', 'error');
+      return;
+    }
+
+    if (!firstLoginCity || !firstLoginCity.trim()) {
+      setFirstLoginError('Please enter your city.');
+      addToast('Please enter your city.', 'error');
+      return;
+    }
+
+    if (!firstLoginCurrentPwd) {
+      setFirstLoginError('Please enter your temporary password.');
+      addToast('Please enter your temporary password.', 'error');
+      return;
+    }
+
     if (firstLoginNewPwd.length < 6) {
+      setFirstLoginError('New password must be at least 6 characters.');
       addToast('Password must be at least 6 characters.', 'error');
       return;
     }
+
+    if (firstLoginNewPwd !== firstLoginConfirmPwd) {
+      setFirstLoginError('New passwords do not match.');
+      addToast('New passwords do not match.', 'error');
+      return;
+    }
+
+    const emailToUse = currentUser?.email || (localStorage.getItem('currentUser') ? JSON.parse(localStorage.getItem('currentUser'))?.email : '') || loginEmail;
+    if (!emailToUse) {
+      setFirstLoginError('Session email missing. Please log in again.');
+      addToast('Session email missing. Please log in again.', 'error');
+      return;
+    }
+
+    setFirstLoginLoading(true);
 
     fetch('http://localhost:8000/api/users/change-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: currentUser.email,
+        email: emailToUse,
         current_password: firstLoginCurrentPwd,
         new_password: firstLoginNewPwd,
-        name: firstLoginName,
-        phone: firstLoginPhone,
-        city: firstLoginCity
+        name: firstLoginName.trim(),
+        phone: firstLoginPhone.trim(),
+        city: firstLoginCity.trim()
       })
-    }).then(res => {
+    }).then(async res => {
       if (res.ok) {
         return res.json();
       }
-      return res.json().then(data => { throw new Error(data.detail || 'Failed to change password.'); });
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || 'Failed to change password.');
     }).then((data) => {
       addToast('Password and profile details updated successfully! Welcome to UrbanFlow.', 'success');
       const updatedUser = data.user;
@@ -267,7 +352,11 @@ export default function App() {
       setFirstLoginCurrentPwd('');
       setFirstLoginNewPwd('');
       setFirstLoginConfirmPwd('');
+      setFirstLoginLoading(false);
+      setFirstLoginError('');
     }).catch(err => {
+      setFirstLoginLoading(false);
+      setFirstLoginError(err.message || 'Error updating password.');
       addToast(err.message || 'Error updating password.', 'error');
     });
   };
@@ -424,7 +513,16 @@ export default function App() {
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     if (!regFName || !regLName) { addToast('Please enter your full name.', 'error'); return; }
-    if (!regEmail.includes('@')) { addToast('Please enter a valid email address.', 'error'); return; }
+    if (!isValidEmail(regEmail)) { 
+      setRegEmailTouched(true);
+      addToast('Please enter a valid email address.', 'error'); 
+      return; 
+    }
+    if (!regPhone || !isValidPhone(regPhone)) {
+      setRegPhoneTouched(true);
+      addToast('Please enter a valid mobile number with country code and 10 digits (e.g. +91 9876543210).', 'error');
+      return;
+    }
     if (regPassword.length < 6) { addToast('Password must be at least 6 characters.', 'error'); return; }
     if (regPassword !== regConfirm) { addToast('Passwords do not match.', 'error'); return; }
     if (!regTerms) { addToast('Please accept the Terms of Service.', 'error'); return; }
@@ -560,10 +658,69 @@ export default function App() {
               <form onSubmit={handleLoginSubmit} className="auth-form">
                 <div className="form-group">
                   <label className="form-label" htmlFor="login-email">Email Address</label>
-                  <div className="input-icon">
+                  <div className="input-icon" style={{ position: 'relative' }}>
                     <Mail className="icon" size={16} />
-                    <input className="form-control" type="email" id="login-email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="Enter email address" required />
+                    <input 
+                      className="form-control" 
+                      type="email" 
+                      id="login-email" 
+                      value={loginEmail} 
+                      onChange={(e) => {
+                        setLoginEmail(e.target.value);
+                        if (!loginEmailTouched && e.target.value.length > 0) {
+                          setLoginEmailTouched(true);
+                        }
+                      }} 
+                      onBlur={() => {
+                        if (loginEmail.length > 0) setLoginEmailTouched(true);
+                      }}
+                      placeholder="Enter email address" 
+                      style={{
+                        paddingRight: '40px',
+                        borderColor: loginEmailTouched && loginEmail.length > 0 
+                          ? (isValidEmail(loginEmail) ? '#10b981' : '#ef4444') 
+                          : undefined,
+                        boxShadow: loginEmailTouched && loginEmail.length > 0 
+                          ? (isValidEmail(loginEmail) ? '0 0 0 3px rgba(16, 185, 129, 0.15)' : '0 0 0 3px rgba(239, 68, 68, 0.15)') 
+                          : undefined
+                      }}
+                      required 
+                    />
+                    {loginEmailTouched && loginEmail.length > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        right: '14px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        pointerEvents: 'none'
+                      }}>
+                        {isValidEmail(loginEmail) ? (
+                          <CheckCircle size={16} color="#10b981" />
+                        ) : (
+                          <AlertTriangle size={16} color="#ef4444" />
+                        )}
+                      </div>
+                    )}
                   </div>
+                  {loginEmailTouched && loginEmail.length > 0 && (
+                    <div style={{ 
+                      fontSize: '12px', 
+                      marginTop: '6px', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '5px',
+                      color: isValidEmail(loginEmail) ? '#10b981' : '#ef4444',
+                      fontWeight: 500
+                    }}>
+                      {isValidEmail(loginEmail) ? (
+                        <span>✓ Valid email address</span>
+                      ) : (
+                        <span>Please enter a valid email format (e.g. name@domain.com)</span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="form-group">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -778,18 +935,132 @@ export default function App() {
 
                 <div className="form-group">
                   <label className="form-label" htmlFor="reg-email">Email Address</label>
-                  <div className="input-icon">
+                  <div className="input-icon" style={{ position: 'relative' }}>
                     <Mail className="icon" size={16} />
-                    <input className="form-control" type="email" id="reg-email" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} placeholder="alex@example.com" required />
+                    <input 
+                      className="form-control" 
+                      type="email" 
+                      id="reg-email" 
+                      value={regEmail} 
+                      onChange={(e) => {
+                        setRegEmail(e.target.value);
+                        if (!regEmailTouched && e.target.value.length > 0) {
+                          setRegEmailTouched(true);
+                        }
+                      }} 
+                      onBlur={() => {
+                        if (regEmail.length > 0) setRegEmailTouched(true);
+                      }}
+                      placeholder="alex@example.com" 
+                      style={{
+                        paddingRight: '40px',
+                        borderColor: regEmailTouched && regEmail.length > 0 
+                          ? (isValidEmail(regEmail) ? '#10b981' : '#ef4444') 
+                          : undefined,
+                        boxShadow: regEmailTouched && regEmail.length > 0 
+                          ? (isValidEmail(regEmail) ? '0 0 0 3px rgba(16, 185, 129, 0.15)' : '0 0 0 3px rgba(239, 68, 68, 0.15)') 
+                          : undefined
+                      }}
+                      required 
+                    />
+                    {regEmailTouched && regEmail.length > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        right: '14px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        pointerEvents: 'none'
+                      }}>
+                        {isValidEmail(regEmail) ? (
+                          <CheckCircle size={16} color="#10b981" />
+                        ) : (
+                          <AlertTriangle size={16} color="#ef4444" />
+                        )}
+                      </div>
+                    )}
                   </div>
+                  {regEmailTouched && regEmail.length > 0 && (
+                    <div style={{ 
+                      fontSize: '12px', 
+                      marginTop: '6px', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '5px',
+                      color: isValidEmail(regEmail) ? '#10b981' : '#ef4444',
+                      fontWeight: 500
+                    }}>
+                      {isValidEmail(regEmail) ? (
+                        <span>✓ Valid email address</span>
+                      ) : (
+                        <span>Please enter a valid email format (e.g. alex@example.com)</span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label" htmlFor="reg-phone">Phone Number</label>
-                  <div className="input-icon">
+                  <label className="form-label" htmlFor="reg-phone">Mobile Number</label>
+                  <div className="input-icon" style={{ position: 'relative' }}>
                     <Phone className="icon" size={16} />
-                    <input className="form-control" type="tel" id="reg-phone" value={regPhone} onChange={(e) => setRegPhone(e.target.value)} placeholder="+91 98765 43210" />
+                    <input 
+                      className="form-control" 
+                      type="tel" 
+                      id="reg-phone" 
+                      value={regPhone} 
+                      onChange={(e) => {
+                        setRegPhone(e.target.value);
+                        if (!regPhoneTouched && e.target.value.length > 0) {
+                          setRegPhoneTouched(true);
+                        }
+                      }} 
+                      onBlur={() => {
+                        if (regPhone.length > 0) setRegPhoneTouched(true);
+                      }}
+                      placeholder="+91 98765 43210" 
+                      style={{
+                        paddingRight: '40px',
+                        borderColor: regPhoneTouched && regPhone.length > 0 
+                          ? (isValidPhone(regPhone) ? '#10b981' : '#ef4444') 
+                          : undefined,
+                        boxShadow: regPhoneTouched && regPhone.length > 0 
+                          ? (isValidPhone(regPhone) ? '0 0 0 3px rgba(16, 185, 129, 0.15)' : '0 0 0 3px rgba(239, 68, 68, 0.15)') 
+                          : undefined
+                      }}
+                      required 
+                    />
+                    {regPhoneTouched && regPhone.length > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        right: '14px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        pointerEvents: 'none'
+                      }}>
+                        {isValidPhone(regPhone) ? (
+                          <CheckCircle size={16} color="#10b981" />
+                        ) : (
+                          <AlertTriangle size={16} color="#ef4444" />
+                        )}
+                      </div>
+                    )}
                   </div>
+                  {regPhoneTouched && regPhone.length > 0 && (
+                    <div style={{ 
+                      fontSize: '12px', 
+                      marginTop: '6px', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '5px',
+                      color: isValidPhone(regPhone) ? '#10b981' : '#ef4444',
+                      fontWeight: 500
+                    }}>
+                      <span>{getPhoneValidationMessage(regPhone)}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -1350,15 +1621,67 @@ export default function App() {
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.5)', marginBottom: '6px' }}>Phone Number</label>
-                <input 
-                  type="tel" 
-                  value={firstLoginPhone} 
-                  onChange={(e) => setFirstLoginPhone(e.target.value)} 
-                  style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: 'white' }}
-                  placeholder="+91 98765 43210"
-                  required
-                />
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.5)', marginBottom: '6px' }}>Mobile Number</label>
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    type="tel" 
+                    value={firstLoginPhone} 
+                    onChange={(e) => {
+                      setFirstLoginPhone(e.target.value);
+                      if (!firstLoginPhoneTouched && e.target.value.length > 0) {
+                        setFirstLoginPhoneTouched(true);
+                      }
+                    }} 
+                    onBlur={() => {
+                      if (firstLoginPhone.length > 0) setFirstLoginPhoneTouched(true);
+                    }}
+                    style={{ 
+                      width: '100%', 
+                      padding: '10px 40px 10px 10px', 
+                      background: '#0f172a', 
+                      border: `1px solid ${firstLoginPhoneTouched && firstLoginPhone.length > 0
+                        ? (isValidPhone(firstLoginPhone) ? '#10b981' : '#ef4444')
+                        : 'rgba(255, 255, 255, 0.1)'}`, 
+                      boxShadow: firstLoginPhoneTouched && firstLoginPhone.length > 0
+                        ? (isValidPhone(firstLoginPhone) ? '0 0 0 3px rgba(16, 185, 129, 0.15)' : '0 0 0 3px rgba(239, 68, 68, 0.15)')
+                        : undefined,
+                      borderRadius: '8px', 
+                      color: 'white' 
+                    }}
+                    placeholder="+91 98765 43210"
+                    required
+                  />
+                  {firstLoginPhoneTouched && firstLoginPhone.length > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      pointerEvents: 'none'
+                    }}>
+                      {isValidPhone(firstLoginPhone) ? (
+                        <CheckCircle size={16} color="#10b981" />
+                      ) : (
+                        <AlertTriangle size={16} color="#ef4444" />
+                      )}
+                    </div>
+                  )}
+                </div>
+                {firstLoginPhoneTouched && firstLoginPhone.length > 0 && (
+                  <div style={{ 
+                    fontSize: '11.5px', 
+                    marginTop: '5px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px',
+                    color: isValidPhone(firstLoginPhone) ? '#10b981' : '#ef4444',
+                    fontWeight: 500 
+                  }}>
+                    <span>{getPhoneValidationMessage(firstLoginPhone)}</span>
+                  </div>
+                )}
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.5)', marginBottom: '6px' }}>City</label>
@@ -1464,8 +1787,50 @@ export default function App() {
                   </button>
                 </div>
               </div>
-              <button type="submit" style={{ width: '100%', padding: '12px', background: 'linear-gradient(to right, #0ea5e9, #06b6d4)', border: 'none', borderRadius: '8px', color: 'white', fontWeight: 700, cursor: 'pointer', marginTop: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                Update Password & Login
+              {firstLoginError && (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '8px',
+                  padding: '10px 12px',
+                  fontSize: '12.5px',
+                  color: '#f87171',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <AlertTriangle size={16} style={{ flexShrink: 0 }} />
+                  <span>{firstLoginError}</span>
+                </div>
+              )}
+
+              <button 
+                type="submit" 
+                disabled={firstLoginLoading}
+                style={{ 
+                  width: '100%', 
+                  padding: '12px', 
+                  background: firstLoginLoading ? 'rgba(14, 165, 233, 0.5)' : 'linear-gradient(to right, #0ea5e9, #06b6d4)', 
+                  border: 'none', 
+                  borderRadius: '8px', 
+                  color: 'white', 
+                  fontWeight: 700, 
+                  cursor: firstLoginLoading ? 'not-allowed' : 'pointer', 
+                  marginTop: '8px', 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                {firstLoginLoading ? (
+                  <>
+                    <RefreshCw size={16} className="spin" />
+                    <span>Saving Changes...</span>
+                  </>
+                ) : (
+                  'Update Password & Login'
+                )}
               </button>
             </form>
           </div>
