@@ -76,33 +76,48 @@ def generate_sumo_files():
     <vType id="ambulance" accel="4.2" decel="5.5" sigma="0.2" length="7" minGap="3.5" maxSpeed="24.0" color="1.0,1.0,1.0"/>
     <vType id="rickshaw" accel="3.0" decel="4.2" sigma="0.4" length="4" minGap="3.5" maxSpeed="16.0" color="0.13,0.77,0.37"/>
 
-    <!-- North incoming flows (Cars, Buses, Motorcycles, Auto-Rickshaws) -->
-    <flow id="flow_n2s_car" type="car" begin="0" end="3600" period="7.0" departLane="0" from="N2C" to="C2S"/>
-    <flow id="flow_n2s_bus" type="bus" begin="10" end="3600" period="24.0" departLane="0" from="N2C" to="C2S"/>
-    <flow id="flow_n2e_bike" type="motorcycle" begin="4" end="3600" period="8.5" departLane="0" from="N2C" to="C2E"/>
-    <flow id="flow_n2w_rick" type="rickshaw" begin="6" end="3600" period="11.0" departLane="0" from="N2C" to="C2W"/>
-    <flow id="flow_n2s_suv" type="suv" begin="8" end="3600" period="14.0" departLane="0" from="N2C" to="C2S"/>
+    <!-- All flows strictly sorted by begin time so SUMO never ignores any flow -->
+    <!-- begin = 0.0: Primary Straight flows -->
+    <flow id="flow_n2s_car" type="car" begin="0.0" end="3600" period="18.0" departLane="0" from="N2C" to="C2S"/>
+    <flow id="flow_s2n_car" type="car" begin="0.0" end="3600" period="18.0" departLane="0" from="S2C" to="C2N"/>
+    <flow id="flow_w2e_car" type="car" begin="0.0" end="3600" period="18.0" departLane="0" from="W2C" to="C2E"/>
+    <flow id="flow_e2w_car" type="car" begin="0.0" end="3600" period="18.0" departLane="0" from="E2C" to="C2W"/>
 
-    <!-- South incoming flows (Trucks, Cars, Motorcycles, SUVs, Auto-Rickshaws) -->
-    <flow id="flow_s2n_car" type="car" begin="0" end="3600" period="7.5" departLane="0" from="S2C" to="C2N"/>
-    <flow id="flow_s2n_truck" type="truck" begin="12" end="3600" period="20.0" departLane="0" from="S2C" to="C2N"/>
-    <flow id="flow_s2w_bike" type="motorcycle" begin="3" end="3600" period="9.0" departLane="0" from="S2C" to="C2W"/>
-    <flow id="flow_s2e_suv" type="suv" begin="5" end="3600" period="12.0" departLane="0" from="S2C" to="C2E"/>
-    <flow id="flow_s2n_rick" type="rickshaw" begin="7" end="3600" period="10.5" departLane="0" from="S2C" to="C2N"/>
+    <!-- begin = 2.0: Right Turn car flows -->
+    <flow id="flow_n2w_car" type="car" begin="2.0" end="3600" period="22.0" departLane="0" from="N2C" to="C2W"/>
+    <flow id="flow_s2e_car" type="car" begin="2.0" end="3600" period="22.0" departLane="0" from="S2C" to="C2E"/>
+    <flow id="flow_w2s_car" type="car" begin="2.0" end="3600" period="22.0" departLane="0" from="W2C" to="C2S"/>
+    <flow id="flow_e2n_car" type="car" begin="2.0" end="3600" period="22.0" departLane="0" from="E2C" to="C2N"/>
 
-    <!-- West incoming flows (Cars, Ambulances, Motorcycles, Auto-Rickshaws, Buses) -->
-    <flow id="flow_w2e_car" type="car" begin="0" end="3600" period="6.5" departLane="0" from="W2C" to="C2E"/>
-    <flow id="flow_w2n_bike" type="motorcycle" begin="2" end="3600" period="8.0" departLane="0" from="W2C" to="C2N"/>
-    <flow id="flow_w2s_rick" type="rickshaw" begin="5" end="3600" period="10.0" departLane="0" from="W2C" to="C2S"/>
-    <flow id="flow_w2e_amb" type="ambulance" begin="30" end="3600" period="90.0" departLane="0" from="W2C" to="C2E"/>
-    <flow id="flow_w2e_bus" type="bus" begin="15" end="3600" period="28.0" departLane="0" from="W2C" to="C2E"/>
+    <!-- begin = 4.0: Left Turn car flows -->
+    <flow id="flow_n2e_car" type="car" begin="4.0" end="3600" period="22.0" departLane="0" from="N2C" to="C2E"/>
+    <flow id="flow_s2w_car" type="car" begin="4.0" end="3600" period="22.0" departLane="0" from="S2C" to="C2W"/>
+    <flow id="flow_w2n_car" type="car" begin="4.0" end="3600" period="22.0" departLane="0" from="W2C" to="C2N"/>
+    <flow id="flow_e2s_car" type="car" begin="4.0" end="3600" period="22.0" departLane="0" from="E2C" to="C2S"/>
 
-    <!-- East incoming flows (Cars, SUVs, Motorcycles, Trucks, Auto-Rickshaws) -->
-    <flow id="flow_e2w_car" type="car" begin="0" end="3600" period="7.0" departLane="0" from="E2C" to="C2W"/>
-    <flow id="flow_e2s_bike" type="motorcycle" begin="4" end="3600" period="8.5" departLane="0" from="E2C" to="C2S"/>
-    <flow id="flow_e2n_suv" type="suv" begin="2" end="3600" period="11.0" departLane="0" from="E2C" to="C2N"/>
-    <flow id="flow_e2w_truck" type="truck" begin="18" end="3600" period="26.0" departLane="0" from="E2C" to="C2W"/>
-    <flow id="flow_e2w_rick" type="rickshaw" begin="6" end="3600" period="9.5" departLane="0" from="E2C" to="C2W"/>
+    <!-- begin = 6.0: Right/Left turning Rickshaws, Bikes, SUVs -->
+    <flow id="flow_n2w_rick" type="rickshaw" begin="6.0" end="3600" period="30.0" departLane="0" from="N2C" to="C2W"/>
+    <flow id="flow_s2w_bike" type="motorcycle" begin="6.0" end="3600" period="30.0" departLane="0" from="S2C" to="C2W"/>
+    <flow id="flow_w2s_rick" type="rickshaw" begin="6.0" end="3600" period="30.0" departLane="0" from="W2C" to="C2S"/>
+    <flow id="flow_e2s_suv" type="suv" begin="6.0" end="3600" period="30.0" departLane="0" from="E2C" to="C2S"/>
+
+    <!-- begin = 8.0: Left/Right turning Bikes & SUVs -->
+    <flow id="flow_n2e_bike" type="motorcycle" begin="8.0" end="3600" period="30.0" departLane="0" from="N2C" to="C2E"/>
+    <flow id="flow_s2e_suv" type="suv" begin="8.0" end="3600" period="30.0" departLane="0" from="S2C" to="C2E"/>
+    <flow id="flow_w2n_bike" type="motorcycle" begin="8.0" end="3600" period="30.0" departLane="0" from="W2C" to="C2N"/>
+    <flow id="flow_e2n_bike" type="motorcycle" begin="8.0" end="3600" period="30.0" departLane="0" from="E2C" to="C2N"/>
+
+    <!-- begin = 10.0: Heavy Transit Straight flows (Buses, Cargo Trucks) -->
+    <flow id="flow_n2s_bus" type="bus" begin="10.0" end="3600" period="40.0" departLane="0" from="N2C" to="C2S"/>
+    <flow id="flow_s2n_truck" type="truck" begin="10.0" end="3600" period="40.0" departLane="0" from="S2C" to="C2N"/>
+    <flow id="flow_w2e_bus" type="bus" begin="10.0" end="3600" period="40.0" departLane="0" from="W2C" to="C2E"/>
+    <flow id="flow_e2w_truck" type="truck" begin="10.0" end="3600" period="40.0" departLane="0" from="E2C" to="C2W"/>
+
+    <!-- begin = 14.0: Secondary Straight flows (SUVs & Auto-Rickshaws) -->
+    <flow id="flow_n2s_suv" type="suv" begin="14.0" end="3600" period="35.0" departLane="0" from="N2C" to="C2S"/>
+    <flow id="flow_s2n_rick" type="rickshaw" begin="14.0" end="3600" period="35.0" departLane="0" from="S2C" to="C2N"/>
+    <flow id="flow_w2e_suv" type="suv" begin="14.0" end="3600" period="35.0" departLane="0" from="W2C" to="C2E"/>
+    <flow id="flow_e2w_rick" type="rickshaw" begin="14.0" end="3600" period="35.0" departLane="0" from="E2C" to="C2W"/>
 </routes>"""
 
     rou_file = os.path.join(out_dir, "sumo.rou.xml")
