@@ -1,4 +1,4 @@
--- Drop tables if they exist to apply clean updates
+DROP TABLE IF EXISTS admin_notifications CASCADE;
 DROP TABLE IF EXISTS report CASCADE;
 DROP TABLE IF EXISTS incident CASCADE;
 DROP TABLE IF EXISTS manualoverride CASCADE;
@@ -22,6 +22,7 @@ CREATE TABLE users (
     security_question VARCHAR(255),
     security_answer VARCHAR(255),
     is_first_login BOOLEAN DEFAULT TRUE,
+    is_online BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -157,3 +158,16 @@ INSERT INTO trafficdata (intersection_id, vehicle_count, queue_length, waiting_t
 INSERT INTO incident (reported_by, intersection_id, type, description, location, status) VALUES
 (3, 1, 'Accident', 'Minor two-car collision blocking the left turning lane from North.', 'Baker Jn - North Leg', 'PENDING'),
 (3, 5, 'Roadblock', 'Construction barricades blocking traffic near bypass loop.', 'Airport Rd & Ring Rd', 'RESOLVED');
+
+-- 11. Create ADMIN_NOTIFICATIONS table
+CREATE TABLE admin_notifications (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(100) NOT NULL,
+    message VARCHAR(255) NOT NULL,
+    type VARCHAR(50) DEFAULT 'OPERATOR_OFFLINE',
+    operator_id INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
+    operator_name VARCHAR(100),
+    intersection_name VARCHAR(100),
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
