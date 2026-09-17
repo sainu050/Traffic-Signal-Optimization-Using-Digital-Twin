@@ -94,15 +94,37 @@ export default function AdminDashboard({
   const knownNotifIdsRef = useRef(new Set())
   const isInitialNotifFetch = useRef(true)
 
+  const formatNotifTime = (dateStr) => {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return dateStr
+    const diffMs = Date.now() - d.getTime()
+    const diffMins = Math.floor(diffMs / (60 * 1000))
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    const diffHours = Math.floor(diffMins / 60)
+    if (diffHours < 24) return `${diffHours}h ago`
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
+
   // Notification API Handlers
   const fetchNotifications = async () => {
     try {
       const res = await fetch('http://localhost:8000/api/admin/notifications')
       if (res.ok) {
         const data = await res.json()
-        const notifs = data.notifications || []
+        const rawNotifs = data.notifications || []
+        // Keep only notifications within the last 24 hours
+        const cutoffTime = Date.now() - 24 * 60 * 60 * 1000
+        const notifs = rawNotifs.filter(n => {
+          if (!n.created_at) return true
+          const t = new Date(n.created_at).getTime()
+          return isNaN(t) || t >= cutoffTime
+        })
+
         setNotifications(notifs)
-        setUnreadNotifCount(data.unread_count || 0)
+        const unreadCount = notifs.filter(n => !n.is_read).length
+        setUnreadNotifCount(unreadCount)
 
         // Detect newly arrived unread notifications
         notifs.forEach(n => {
@@ -753,6 +775,16 @@ export default function AdminDashboard({
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <Bell size={16} color="#06b6d4" />
                         <span style={{ fontSize: 13.5, fontWeight: 700, color: 'white' }}>Notifications</span>
+                        <span style={{
+                          fontSize: 10,
+                          color: 'rgba(255,255,255,0.4)',
+                          fontWeight: 600,
+                          background: 'rgba(255,255,255,0.06)',
+                          padding: '1px 6px',
+                          borderRadius: 6
+                        }}>
+                          24h
+                        </span>
                         {unreadNotifCount > 0 && (
                           <span style={{
                             fontSize: 11,
@@ -791,13 +823,24 @@ export default function AdminDashboard({
                       maxHeight: 440,
                       padding: '8px'
                     }}>
-                      {notifications.length === 0 ? (
-                        <div style={{ padding: '36px 20px', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>
-                          <CheckCircle size={32} color="#10b981" style={{ margin: '0 auto 8px', display: 'block', opacity: 0.6 }} />
-                          All clear! No notifications.
-                        </div>
-                      ) : (
-                        notifications.map(notif => {
+                      {(() => {
+                        const cutoffTime = Date.now() - 24 * 60 * 60 * 1000
+                        const visibleNotifications = notifications.filter(n => {
+                          if (!n.created_at) return true
+                          const t = new Date(n.created_at).getTime()
+                          return isNaN(t) || t >= cutoffTime
+                        })
+
+                        if (visibleNotifications.length === 0) {
+                          return (
+                            <div style={{ padding: '36px 20px', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>
+                              <CheckCircle size={32} color="#10b981" style={{ margin: '0 auto 8px', display: 'block', opacity: 0.6 }} />
+                              All clear! No notifications in the last 24 hours.
+                            </div>
+                          )
+                        }
+
+                        return visibleNotifications.map(notif => {
                           const isOfflineAlert = notif.type === 'OPERATOR_OFFLINE'
                           const isOnlineAlert = notif.type === 'OPERATOR_ONLINE'
 
@@ -849,8 +892,11 @@ export default function AdminDashboard({
                                     <span style={{ fontSize: 13, fontWeight: 700, color: titleColor }}>
                                       {notif.title}
                                     </span>
-                                    <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.35)', fontFamily: 'monospace' }}>
-                                      {new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    <span 
+                                      title={notif.created_at ? new Date(notif.created_at).toLocaleString() : ''}
+                                      style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}
+                                    >
+                                      {formatNotifTime(notif.created_at)}
                                     </span>
                                   </div>
                                   <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', margin: '4px 0 8px', lineHeight: 1.4 }}>
@@ -914,7 +960,7 @@ export default function AdminDashboard({
                             </div>
                           )
                         })
-                      )}
+                      })()}
                     </div>
                   </div>
                 </>

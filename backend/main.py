@@ -760,8 +760,23 @@ def update_operator_duty_status(id: int, data: OperatorDutyStatusSchema, db: Ses
 
 @app.get("/api/admin/notifications")
 def get_admin_notifications(db: Session = Depends(get_db)):
-    notifs = db.query(AdminNotification).order_by(AdminNotification.id.desc()).limit(30).all()
-    unread_count = db.query(AdminNotification).filter(AdminNotification.is_read == False).count()
+    cutoff = datetime.datetime.utcnow() - datetime.timedelta(hours=24)
+    # Auto-prune notifications older than 24 hours
+    try:
+        db.query(AdminNotification).filter(AdminNotification.created_at < cutoff).delete()
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    notifs = db.query(AdminNotification).filter(
+        AdminNotification.created_at >= cutoff
+    ).order_by(AdminNotification.id.desc()).limit(30).all()
+
+    unread_count = db.query(AdminNotification).filter(
+        AdminNotification.is_read == False,
+        AdminNotification.created_at >= cutoff
+    ).count()
+
     return {
         "notifications": [
             {
@@ -773,7 +788,7 @@ def get_admin_notifications(db: Session = Depends(get_db)):
                 "operator_name": n.operator_name,
                 "intersection_name": n.intersection_name,
                 "is_read": n.is_read,
-                "created_at": n.created_at.strftime("%Y-%m-%d %H:%M:%S") if n.created_at else ""
+                "created_at": n.created_at.strftime("%Y-%m-%dT%H:%M:%SZ") if n.created_at else ""
             } for n in notifs
         ],
         "unread_count": unread_count
@@ -789,7 +804,8 @@ def mark_notification_read(id: int, db: Session = Depends(get_db)):
 
 @app.put("/api/admin/notifications/read-all")
 def mark_all_notifications_read(db: Session = Depends(get_db)):
-    db.query(AdminNotification).update({AdminNotification.is_read: True})
+    cutoff = datetime.datetime.utcnow() - datetime.timedelta(hours=24)
+    db.query(AdminNotification).filter(AdminNotification.created_at >= cutoff).update({AdminNotification.is_read: True})
     db.commit()
     return {"success": True}
 
