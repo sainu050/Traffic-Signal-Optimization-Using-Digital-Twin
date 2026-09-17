@@ -712,6 +712,26 @@ def update_operator_duty_status(id: int, data: OperatorDutyStatusSchema, db: Ses
         db.add(audit)
         db.commit()
     else:
+        # Mark any pending offline alerts for this operator as read/resolved
+        db.query(AdminNotification).filter(
+            AdminNotification.operator_id == user.user_id,
+            AdminNotification.type == "OPERATOR_OFFLINE",
+            AdminNotification.is_read == False
+        ).update({AdminNotification.is_read: True})
+
+        # Create an admin notification for operator back online
+        notif_msg = f"Traffic Controller {user.name} is now back ONLINE at {assigned_name}." if assigned_name != "Unassigned" else f"Traffic Controller {user.name} is now back ONLINE."
+        notif = AdminNotification(
+            title="Traffic Controller Online",
+            message=notif_msg,
+            type="OPERATOR_ONLINE",
+            operator_id=user.user_id,
+            operator_name=user.name,
+            intersection_name=assigned_name,
+            is_read=False
+        )
+        db.add(notif)
+
         audit = AuditLog(
             time=now_str,
             user_name=f"{user.name} (Operator)",

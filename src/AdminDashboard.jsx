@@ -104,13 +104,17 @@ export default function AdminDashboard({
         setNotifications(notifs)
         setUnreadNotifCount(data.unread_count || 0)
 
-        // Detect newly arrived unread offline notifications
+        // Detect newly arrived unread notifications
         notifs.forEach(n => {
-          if (!n.is_read && n.type === 'OPERATOR_OFFLINE') {
+          if (!n.is_read && (n.type === 'OPERATOR_OFFLINE' || n.type === 'OPERATOR_ONLINE')) {
             if (!knownNotifIdsRef.current.has(n.id)) {
               knownNotifIdsRef.current.add(n.id)
               if (!isInitialNotifFetch.current) {
-                addToast(`⚠️ Operator ${n.operator_name} went OFFLINE from ${n.intersection_name}! Please assign a replacement.`, 'warning')
+                if (n.type === 'OPERATOR_OFFLINE') {
+                  addToast(`⚠️ Operator ${n.operator_name} went OFFLINE from ${n.intersection_name}! Please assign a replacement.`, 'warning')
+                } else if (n.type === 'OPERATOR_ONLINE') {
+                  addToast(`🟢 Traffic Controller ${n.operator_name} is now back ONLINE${n.intersection_name && n.intersection_name !== 'Unassigned' ? ` at ${n.intersection_name}` : ''}!`, 'success')
+                }
                 // Refresh operator list so duty status updates immediately
                 fetch('http://localhost:8000/api/operators')
                   .then(r => r.json())
@@ -795,6 +799,28 @@ export default function AdminDashboard({
                       ) : (
                         notifications.map(notif => {
                           const isOfflineAlert = notif.type === 'OPERATOR_OFFLINE'
+                          const isOnlineAlert = notif.type === 'OPERATOR_ONLINE'
+
+                          let cardBg = notif.is_read ? 'rgba(255,255,255,0.02)' : 'rgba(6, 182, 212, 0.08)'
+                          let cardBorder = notif.is_read ? 'rgba(255,255,255,0.04)' : 'rgba(6, 182, 212, 0.25)'
+                          let iconBg = 'rgba(6, 182, 212, 0.15)'
+                          let iconColor = '#06b6d4'
+                          let titleColor = 'white'
+
+                          if (isOfflineAlert) {
+                            cardBg = notif.is_read ? 'rgba(255,255,255,0.02)' : 'rgba(245, 158, 11, 0.08)'
+                            cardBorder = notif.is_read ? 'rgba(255,255,255,0.04)' : 'rgba(245, 158, 11, 0.25)'
+                            iconBg = 'rgba(245, 158, 11, 0.15)'
+                            iconColor = '#f59e0b'
+                            titleColor = notif.is_read ? 'rgba(255,255,255,0.85)' : '#f59e0b'
+                          } else if (isOnlineAlert) {
+                            cardBg = notif.is_read ? 'rgba(255,255,255,0.02)' : 'rgba(16, 185, 129, 0.08)'
+                            cardBorder = notif.is_read ? 'rgba(255,255,255,0.04)' : 'rgba(16, 185, 129, 0.25)'
+                            iconBg = 'rgba(16, 185, 129, 0.15)'
+                            iconColor = '#10b981'
+                            titleColor = notif.is_read ? 'rgba(255,255,255,0.85)' : '#10b981'
+                          }
+
                           return (
                             <div
                               key={notif.id}
@@ -802,8 +828,8 @@ export default function AdminDashboard({
                                 padding: '12px 14px',
                                 borderRadius: 10,
                                 marginBottom: 6,
-                                background: notif.is_read ? 'rgba(255,255,255,0.02)' : (isOfflineAlert ? 'rgba(245, 158, 11, 0.08)' : 'rgba(6, 182, 212, 0.08)'),
-                                border: `1px solid ${notif.is_read ? 'rgba(255,255,255,0.04)' : (isOfflineAlert ? 'rgba(245, 158, 11, 0.25)' : 'rgba(6, 182, 212, 0.25)')}`,
+                                background: cardBg,
+                                border: `1px solid ${cardBorder}`,
                                 transition: 'all 0.2s'
                               }}
                             >
@@ -811,16 +837,16 @@ export default function AdminDashboard({
                                 <div style={{
                                   padding: 6,
                                   borderRadius: 8,
-                                  background: isOfflineAlert ? 'rgba(245, 158, 11, 0.15)' : 'rgba(6, 182, 212, 0.15)',
-                                  color: isOfflineAlert ? '#f59e0b' : '#06b6d4',
+                                  background: iconBg,
+                                  color: iconColor,
                                   flexShrink: 0,
                                   marginTop: 2
                                 }}>
-                                  {isOfflineAlert ? <AlertTriangle size={15} /> : <Info size={15} />}
+                                  {isOfflineAlert ? <AlertTriangle size={15} /> : (isOnlineAlert ? <CheckCircle size={15} /> : <Info size={15} />)}
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span style={{ fontSize: 13, fontWeight: 700, color: isOfflineAlert ? '#f59e0b' : 'white' }}>
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: titleColor }}>
                                       {notif.title}
                                     </span>
                                     <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.35)', fontFamily: 'monospace' }}>
@@ -852,6 +878,19 @@ export default function AdminDashboard({
                                         <UserCheck size={13} />
                                         Assign Replacement
                                       </button>
+                                    )}
+                                    {isOnlineAlert && (
+                                      <span style={{
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        color: '#10b981',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 4
+                                      }}>
+                                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} />
+                                        Active On Duty
+                                      </span>
                                     )}
                                     {!notif.is_read && (
                                       <button
