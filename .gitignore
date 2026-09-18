@@ -36,3 +36,8 @@ backend/sent_emails.txt
 .env
 .env.local
 .env.*.local
+
+# Selenium tests and reports (strictly local only)
+tests/
+reports/
+.pytest_cache/
