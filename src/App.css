@@ -1291,6 +1291,9 @@
 }
 
 .admin-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
   width: 260px;
   background-color: #0b1424;
   border-right: 1px solid var(--admin-border);
@@ -1299,6 +1302,7 @@
   transition: width var(--transition);
   flex-shrink: 0;
   z-index: 100;
+  overflow: hidden;
 }
 
 .admin-sidebar.collapsed {
@@ -1331,6 +1335,7 @@
   flex-direction: column;
   gap: 6px;
   flex: 1;
+  overflow-y: auto;
 }
 
 .admin-menu-item {
@@ -1373,6 +1378,8 @@
 .admin-sidebar-footer {
   padding: 16px 20px;
   border-top: 1px solid var(--admin-border);
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
 .admin-sidebar.collapsed .admin-sidebar-footer {
@@ -1386,6 +1393,7 @@
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
+  min-width: 0;
 }
 
 .admin-topbar {

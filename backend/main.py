@@ -76,9 +76,10 @@ class Incident(Base):
     reported_by = Column(Integer, nullable=True)
     intersection_id = Column(Integer, nullable=True)
     type = Column(String(50), nullable=False)
-    description = Column(String(255), nullable=True)
+    priority = Column(String(20), default="Moderate")
+    description = Column(String(500), nullable=True)
     location = Column(String(255), nullable=False)
-    status = Column(String(20), default="PENDING")
+    status = Column(String(30), default="PENDING")
     reported_at = Column(DateTime, default=datetime.datetime.utcnow)
     verified_by = Column(Integer, nullable=True)
 
@@ -153,10 +154,15 @@ class OperatorDutyStatusSchema(BaseModel):
 class IncidentCreate(BaseModel):
     location: str
     type: str
-    priority: str
-    reported_by: str
+    priority: str = "Moderate"
+    description: str = ""
+    reported_by: str = "Citizen"
     status: str = "Pending"
     time: str = "Just now"
+
+class IncidentStatusUpdate(BaseModel):
+    status: str
+    verified_by: str = "Traffic Operator"
 
 class AuditLogCreate(BaseModel):
     user_name: str
@@ -827,20 +833,36 @@ def get_incidents(db: Session = Depends(get_db)):
     incidents = db.query(Incident).order_by(Incident.incident_id.desc()).all()
     results = []
     for inc in incidents:
-        reporter = "Unknown"
+        reporter = "Anonymous"
         if inc.reported_by:
             user = db.query(User).filter(User.user_id == inc.reported_by).first()
             if user:
                 reporter = user.name
-                
+
+        time_str = "Just now"
+        if inc.reported_at:
+            delta = datetime.datetime.utcnow() - inc.reported_at
+            secs = int(delta.total_seconds())
+            if secs < 60:
+                time_str = "Just now"
+            elif secs < 3600:
+                time_str = f"{secs // 60}m ago"
+            elif secs < 86400:
+                time_str = f"{secs // 3600}h ago"
+            else:
+                time_str = inc.reported_at.strftime("%b %d, %H:%M")
+
         results.append({
             "id": f"INC-{inc.incident_id}",
+            "numeric_id": inc.incident_id,
             "location": inc.location,
             "type": inc.type,
-            "priority": inc.priority,
+            "priority": inc.priority or "Moderate",
+            "description": inc.description or "",
             "reportedBy": reporter,
-            "status": inc.status.capitalize(),
-            "time": "Just now"
+            "status": inc.status.capitalize() if inc.status else "Pending",
+            "time": time_str,
+            "reported_at": inc.reported_at.strftime("%Y-%m-%dT%H:%M:%SZ") if inc.reported_at else None
         })
     return results
 
@@ -853,15 +875,100 @@ def create_incident(data: IncidentCreate, db: Session = Depends(get_db)):
     incident = Incident(
         location=data.location,
         type=data.type,
-        priority=data.priority,
+        priority=data.priority or "Moderate",
+        description=data.description or "",
         reported_by=rep_id,
-        status=data.status.upper(),
-        time=data.time
+        status=data.status.upper() if data.status else "PENDING",
+        reported_at=datetime.datetime.utcnow()
     )
     db.add(incident)
     db.commit()
     db.refresh(incident)
-    return incident
+
+    # 1. Create an AdminNotification of type INCIDENT_REPORTED
+    try:
+        notif = AdminNotification(
+            title=f"Incident Reported: {data.type}",
+            message=f"{data.reported_by or 'Citizen'} reported {data.type} at {data.location} (Priority: {data.priority}). {data.description[:100] if data.description else ''}",
+            type="INCIDENT_REPORTED",
+            intersection_name=data.location,
+            operator_name=data.reported_by or "Citizen",
+            is_read=False,
+            created_at=datetime.datetime.utcnow()
+        )
+        db.add(notif)
+    except Exception as e:
+        print(f"Failed to create incident admin notification: {e}")
+
+    # 2. Add an AuditLog entry
+    try:
+        time_str = datetime.datetime.now().strftime("%H:%M:%S")
+        log = AuditLog(
+            time=time_str,
+            user_name=data.reported_by or "Public Citizen",
+            action="Reported Traffic Incident",
+            target=f"{data.type} at {data.location}"
+        )
+        db.add(log)
+    except Exception as e:
+        print(f"Failed to create audit log for incident: {e}")
+
+    db.commit()
+
+    return {
+        "id": f"INC-{incident.incident_id}",
+        "numeric_id": incident.incident_id,
+        "location": incident.location,
+        "type": incident.type,
+        "priority": incident.priority,
+        "description": incident.description,
+        "reportedBy": data.reported_by or "Citizen",
+        "status": incident.status.capitalize(),
+        "time": "Just now",
+        "success": True,
+        "message": "Incident reported successfully. Traffic Controllers and Admins have been notified."
+    }
+
+@app.put("/api/incidents/{incident_id}/status")
+def update_incident_status(incident_id: str, data: IncidentStatusUpdate, db: Session = Depends(get_db)):
+    clean_id = incident_id.replace("INC-", "").strip()
+    try:
+        inc_num = int(clean_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid incident ID format")
+
+    incident = db.query(Incident).filter(Incident.incident_id == inc_num).first()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    incident.status = data.status.upper()
+    
+    if data.verified_by:
+        verifier = db.query(User).filter(User.name == data.verified_by).first()
+        if verifier:
+            incident.verified_by = verifier.user_id
+
+    try:
+        time_str = datetime.datetime.now().strftime("%H:%M:%S")
+        log = AuditLog(
+            time=time_str,
+            user_name=data.verified_by or "Traffic Operator",
+            action=f"Incident Status Changed to {data.status.upper()}",
+            target=f"INC-{incident.incident_id} ({incident.type} at {incident.location})"
+        )
+        db.add(log)
+    except Exception as e:
+        print(f"Failed to log incident update: {e}")
+
+    db.commit()
+    db.refresh(incident)
+
+    return {
+        "id": f"INC-{incident.incident_id}",
+        "status": incident.status.capitalize(),
+        "success": True,
+        "message": f"Incident INC-{incident.incident_id} updated to {data.status.capitalize()}"
+    }
 
 # ─── AUDIT LOGS ROUTES ───
 

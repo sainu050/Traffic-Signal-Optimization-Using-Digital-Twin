@@ -6,12 +6,14 @@ import {
   Satellite, Bell, BarChart3, Users, Route, Activity,
   LayoutDashboard, Sliders, ToggleLeft, Layers, Settings,
   Search, FileText, Database, Server, HardDrive, Play,
-  Pause, RefreshCw, Power, Compass, MessageSquare, HelpCircle
+  Pause, RefreshCw, Power, MessageSquare, HelpCircle,
+  Clock
 } from 'lucide-react';
 import './App.css';
 import LandingPage from './LandingPage';
 import AdminDashboard from './AdminDashboard';
 import OperatorDashboard from './OperatorDashboard';
+import SimulationCanvas from './SimulationCanvas';
 
 // ══════════════════════════════════════════
 // DATA MODEL & INITIAL CONFIGS
@@ -113,7 +115,42 @@ export default function App() {
   
   // Public Dashboard States
   const [publicActiveTab, setPublicActiveTab] = useState('dashboard');
-  const [publicSearchQuery, setPublicSearchQuery] = useState('');
+  const [publicMetrics, setPublicMetrics] = useState({
+    vehicleCount: 15,
+    avgWait: 8,
+    congestion: 'Low'
+  });
+
+  const handlePublicMetricsUpdate = (metrics) => {
+    setPublicMetrics(metrics);
+  };
+  
+  // Public Incident Reporting States
+  const [incidentType, setIncidentType] = useState('Road Accident');
+  const [incidentLocation, setIncidentLocation] = useState('Baker Jn');
+  const [incidentCustomLocation, setIncidentCustomLocation] = useState('');
+  const [incidentPriority, setIncidentPriority] = useState('Moderate');
+  const [incidentDesc, setIncidentDesc] = useState('');
+  const [incidentPhone, setIncidentPhone] = useState('');
+  const [isSubmittingIncident, setIsSubmittingIncident] = useState(false);
+  const [publicIncidents, setPublicIncidents] = useState([]);
+
+  const fetchPublicIncidents = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/incidents');
+      if (res.ok) {
+        const data = await res.json();
+        setPublicIncidents(data);
+      }
+    } catch (err) {
+      console.error('Failed to load incidents:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchPublicIncidents();
+  }, [currentPage]);
+
   const [feedbackType, setFeedbackType] = useState('issue');
   const [feedbackDesc, setFeedbackDesc] = useState('');
   const [feedbackLocation, setFeedbackLocation] = useState('');
@@ -487,6 +524,49 @@ export default function App() {
     addToast('Feedback successfully submitted to City Traffic Command Center.', 'success');
     setFeedbackDesc('');
     setFeedbackLocation('');
+  };
+
+  const handleIncidentSubmit = async (e) => {
+    e.preventDefault();
+    const finalLocation = incidentLocation === 'Other' ? incidentCustomLocation.trim() : incidentLocation;
+    if (!finalLocation) {
+      addToast('Please specify the incident location or intersection.', 'error');
+      return;
+    }
+    if (!incidentDesc.trim()) {
+      addToast('Please describe the situation in the details field.', 'error');
+      return;
+    }
+
+    setIsSubmittingIncident(true);
+    try {
+      const res = await fetch('http://localhost:8000/api/incidents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: incidentType,
+          location: finalLocation,
+          priority: incidentPriority,
+          description: incidentDesc.trim(),
+          reported_by: currentUser?.name || 'Public Citizen',
+          status: 'Pending'
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        addToast(`🚨 Incident ${data.id} submitted! Traffic Controllers and Admins have been notified.`, 'success');
+        setIncidentDesc('');
+        setIncidentCustomLocation('');
+        fetchPublicIncidents();
+      } else {
+        addToast('Failed to submit incident report. Please try again.', 'error');
+      }
+    } catch (err) {
+      addToast(`Server connection error: ${err.message}`, 'error');
+    } finally {
+      setIsSubmittingIncident(false);
+    }
   };
 
   const checkPasswordStrength = (val) => {
@@ -1194,11 +1274,8 @@ export default function App() {
             <nav className="admin-menu-list">
               {[
                 { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-                { id: 'live_traffic', label: 'Live Traffic', icon: <Route size={18} /> },
-                { id: 'conditions', label: 'Road Conditions', icon: <Activity size={18} /> },
-                { id: 'planner', label: 'Travel Planner', icon: <Compass size={18} /> },
                 { id: 'notifications', label: 'Notifications', icon: <Bell size={18} /> },
-                { id: 'feedback', label: 'Feedback & Reports', icon: <MessageSquare size={18} /> },
+                { id: 'incidents', label: 'Report Incidents', icon: <AlertTriangle size={18} /> },
                 { id: 'profile', label: 'My Profile', icon: <Users size={18} /> },
               ].map(item => (
                 <button
@@ -1236,19 +1313,7 @@ export default function App() {
           <div className="admin-layout-main">
             {/* Topbar */}
             <header className="admin-topbar">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div className="admin-search-wrapper" style={{ width: '260px' }}>
-                  <Search className="icon" size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--admin-text-muted)' }} />
-                  <input 
-                    className="admin-search-input" 
-                    type="text" 
-                    placeholder="Search roads or intersections..." 
-                    style={{ paddingLeft: '36px' }}
-                    value={publicSearchQuery}
-                    onChange={(e) => setPublicSearchQuery(e.target.value)}
-                  />
-                </div>
-              </div>
+              <div></div>
 
               <div className="admin-topbar-actions">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--admin-text-muted)', fontSize: '13px', fontFamily: 'var(--font-mono)' }}>
@@ -1293,10 +1358,34 @@ export default function App() {
                   {/* Public Stats Cards */}
                   <div className="admin-stats-grid">
                     {[
-                      { label: 'Traffic Status', value: 'Normal Flow', icon: <Activity size={18} />, color: 'var(--admin-accent-green)', bg: 'rgba(16, 185, 129, 0.1)' },
-                      { label: 'Congested Roads', value: '2 Active', icon: <Sliders size={18} />, color: 'var(--admin-accent-cyan)', bg: 'rgba(6, 182, 212, 0.1)' },
-                      { label: 'Road Closures', value: '1 Closure', icon: <Power size={18} />, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
-                      { label: 'Avg Travel Time', value: '14.5 min', icon: <Star size={18} />, color: 'var(--admin-accent-blue)', bg: 'rgba(59, 130, 246, 0.1)' },
+                      { 
+                        label: 'Traffic Status', 
+                        value: `${publicMetrics.congestion} Flow`, 
+                        icon: <Activity size={18} />, 
+                        color: publicMetrics.congestion === 'High' ? '#ef4444' : (publicMetrics.congestion === 'Moderate' ? 'var(--admin-accent-cyan)' : 'var(--admin-accent-green)'), 
+                        bg: publicMetrics.congestion === 'High' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)' 
+                      },
+                      { 
+                        label: 'Active Vehicles', 
+                        value: `${publicMetrics.vehicleCount} Vehicles`, 
+                        icon: <Sliders size={18} />, 
+                        color: 'var(--admin-accent-cyan)', 
+                        bg: 'rgba(6, 182, 212, 0.1)' 
+                      },
+                      { 
+                        label: 'Avg Signal Delay', 
+                        value: `${Math.round(publicMetrics.avgWait)}s Wait`, 
+                        icon: <Clock size={18} />, 
+                        color: 'var(--admin-accent-blue)', 
+                        bg: 'rgba(59, 130, 246, 0.1)' 
+                      },
+                      { 
+                        label: 'Delay Reduction', 
+                        value: '-28.9% Delay', 
+                        icon: <Star size={18} />, 
+                        color: '#8b5cf6', 
+                        bg: 'rgba(139, 92, 246, 0.1)' 
+                      },
                     ].map((stat, idx) => (
                       <div key={idx} className="admin-stat-card">
                         <div className="admin-stat-card-header">
@@ -1313,56 +1402,48 @@ export default function App() {
                   {/* Center Panel Traffic Map & Sidebar Grid */}
                   <div className="admin-middle-grid">
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                      {/* Large Center Map Panel */}
+                      {/* Large Center Map Panel - Digital Twin Simulation Canvas */}
                       <div className="admin-panel">
-                        <div className="admin-panel-header">
-                          <span className="admin-panel-title">
-                            <Route size={16} style={{ color: 'var(--admin-accent-cyan)' }} /> Interactive City Traffic Network Map
-                          </span>
+                        <div className="admin-panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <span className="admin-panel-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <Route size={16} style={{ color: 'var(--admin-accent-cyan)' }} /> Digital Twin Live Traffic Simulation Map
+                            </span>
+                            <div style={{ fontSize: '11.5px', color: 'var(--admin-text-muted)', marginTop: '2px' }}>
+                              Baker Jn Real-Time Adaptive Telemetry Canvas Sync
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ 
+                              fontSize: '11px', 
+                              color: 'var(--admin-accent-cyan)', 
+                              background: 'rgba(6, 182, 212, 0.1)', 
+                              border: '1px solid rgba(6, 182, 212, 0.25)', 
+                              padding: '3px 10px', 
+                              borderRadius: '12px', 
+                              fontWeight: '600',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px'
+                            }}>
+                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--admin-accent-cyan)' }}></span>
+                              Live Simulation Active
+                            </span>
+                          </div>
                         </div>
-                        <div style={{ height: '320px', background: '#09111e', border: '1px solid var(--admin-border)', borderRadius: '12px', position: 'relative', overflow: 'hidden' }}>
-                          <div style={{ position: 'absolute', inset: 0, opacity: 0.1, backgroundImage: 'radial-gradient(var(--admin-accent-cyan) 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
-                          
-                          {/* Map Roads layout */}
-                          {/* Main Street */}
-                          <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '40px', background: '#122035', transform: 'translateY(-50%)', borderTop: '1px solid rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div style={{ borderTop: '2px dashed var(--admin-accent-green)', width: '100%', height: '1px', position: 'absolute', top: '50%', opacity: 0.6 }}></div>
-                          </div>
-                          
-                          {/* Ring Road */}
-                          <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: '40px', background: '#122035', transform: 'translateX(-50%)', borderLeft: '1px solid rgba(255,255,255,0.05)', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div style={{ borderLeft: '2px dashed #ef4444', height: '100%', width: '1px', position: 'absolute', left: '50%', opacity: 0.6 }}></div>
-                          </div>
 
-                          {/* Harbor Boulevard */}
-                          <div style={{ position: 'absolute', left: '15%', top: 0, bottom: 0, width: '30px', background: '#122035', borderLeft: '1px solid rgba(255,255,255,0.02)', borderRight: '1px solid rgba(255,255,255,0.02)' }}>
-                            <div style={{ borderLeft: '2px dashed var(--admin-accent-cyan)', height: '100%', width: '1px', position: 'absolute', left: '50%', opacity: 0.6 }}></div>
-                          </div>
-
-                          {/* Traffic Lights */}
-                          <div style={{ position: 'absolute', left: '52%', top: '35%', width: '12px', height: '12px', borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 10px #ef4444' }} title="Signal Red"></div>
-                          <div style={{ position: 'absolute', left: '16.5%', top: '35%', width: '12px', height: '12px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 10px #10b981' }} title="Signal Green"></div>
-
-                          {/* Vehicles Markers */}
-                          <div style={{ position: 'absolute', left: '30%', top: '48%', fontSize: '16px' }} title="Bus 🚌">🚌</div>
-                          <div style={{ position: 'absolute', left: '49%', top: '20%', fontSize: '16px' }} title="Congested Queue 🚗">🚗</div>
-                          <div style={{ position: 'absolute', left: '49%', top: '12%', fontSize: '16px' }} title="Congested Queue 🚗">🚗</div>
-                          <div style={{ position: 'absolute', left: '70%', top: '45%', fontSize: '16px' }} title="Car 🚗">🚗</div>
-
-                          <div style={{ position: 'absolute', bottom: '16px', right: '16px', background: 'rgba(6, 12, 22, 0.8)', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--admin-border)', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ width: '10px', height: '2px', background: 'var(--admin-accent-green)' }}></span>
-                              <span>Smooth Flow (Main St)</span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ width: '10px', height: '2px', background: '#ef4444' }}></span>
-                              <span>Heavy Congestion (Ring Rd)</span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ width: '10px', height: '2px', background: 'var(--admin-accent-cyan)' }}></span>
-                              <span>Moderate Flow (Harbor Blvd)</span>
-                            </div>
-                          </div>
+                        <div style={{ 
+                          height: '480px', 
+                          background: '#070a13', 
+                          border: '1px solid rgba(255,255,255,0.05)', 
+                          borderRadius: '12px', 
+                          position: 'relative', 
+                          overflow: 'hidden', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center' 
+                        }}>
+                          <SimulationCanvas onMetricsUpdate={handlePublicMetricsUpdate} />
                         </div>
                       </div>
                     </div>
@@ -1560,7 +1641,341 @@ export default function App() {
                 </>
               )}
 
-              {['live_traffic', 'conditions', 'planner', 'notifications', 'feedback', 'profile'].includes(publicActiveTab) && (
+              {publicActiveTab === 'incidents' && (
+                <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  {/* Title Row */}
+                  <div className="admin-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <h1 style={{ fontSize: '24px', fontWeight: '800', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ color: '#ef4444' }}>🚨</span> Report Traffic Incident
+                      </h1>
+                      <div className="admin-subtitle">
+                        Submit road disruptions, accidents, and hazards. Directly notified to City Traffic Controllers and Admins in real time.
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{
+                        fontSize: '11px',
+                        color: 'var(--admin-accent-green)',
+                        background: 'rgba(16, 185, 129, 0.1)',
+                        border: '1px solid rgba(16, 185, 129, 0.25)',
+                        padding: '4px 12px',
+                        borderRadius: '12px',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--admin-accent-green)' }}></span>
+                        Command Center Live Sync
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Incident Form and Info Grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
+                    {/* Left: Incident Reporting Form */}
+                    <div className="admin-panel" style={{ padding: '24px' }}>
+                      <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '16px', marginBottom: '20px' }}>
+                        <h2 style={{ fontSize: '16px', fontWeight: '700', color: 'white', margin: 0 }}>Incident Details & Telemetry Form</h2>
+                        <p style={{ fontSize: '12px', color: 'var(--admin-text-muted)', margin: '4px 0 0' }}>Provide accurate information to facilitate rapid controller dispatch and emergency response.</p>
+                      </div>
+
+                      <form onSubmit={handleIncidentSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {/* Incident Type & Location */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                          <div className="form-group">
+                            <label className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px', fontWeight: '600' }}>
+                              Incident Type *
+                            </label>
+                            <select
+                              className="form-control"
+                              style={{ background: '#09111e', border: '1px solid var(--admin-border)', color: 'white', fontSize: '13px' }}
+                              value={incidentType}
+                              onChange={(e) => setIncidentType(e.target.value)}
+                            >
+                              <option value="Road Accident">💥 Road Accident / Collision</option>
+                              <option value="Severe Congestion">🚗 Severe Congestion / Gridlock</option>
+                              <option value="Damaged Signal">🚦 Damaged / Broken Signal</option>
+                              <option value="Road Hazard">⚠️ Road Hazard / Obstruction</option>
+                              <option value="Waterlogging">🌊 Waterlogging / Flooding</option>
+                              <option value="Vehicle Breakdown">🛑 Stalled / Breakdown Vehicle</option>
+                              <option value="Illegal Parking">🚫 Illegal Parking / Lane Block</option>
+                              <option value="Other Disruption">📝 Other Transit Issue</option>
+                            </select>
+                          </div>
+
+                          <div className="form-group">
+                            <label className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px', fontWeight: '600' }}>
+                              Junction / Intersection *
+                            </label>
+                            <select
+                              className="form-control"
+                              style={{ background: '#09111e', border: '1px solid var(--admin-border)', color: 'white', fontSize: '13px' }}
+                              value={incidentLocation}
+                              onChange={(e) => setIncidentLocation(e.target.value)}
+                            >
+                              <option value="Baker Jn">Baker Jn</option>
+                              <option value="Airport Rd & Ring Rd">Airport Rd & Ring Rd</option>
+                              <option value="Harbor Blvd & 5th">Harbor Blvd & 5th</option>
+                              <option value="Main St & 1st Ave">Main St & 1st Ave</option>
+                              <option value="Park Rd & Central">Park Rd & Central</option>
+                              <option value="Station Rd & Market">Station Rd & Market</option>
+                              <option value="North Highway Interchange">North Highway Interchange</option>
+                              <option value="Other">Custom Location / Street...</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {incidentLocation === 'Other' && (
+                          <div className="form-group">
+                            <label className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px', fontWeight: '600' }}>
+                              Specific Street Name / Landmark *
+                            </label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="e.g. Near Central Park Metro Exit 3"
+                              style={{ background: '#09111e', border: '1px solid var(--admin-border)', color: 'white', fontSize: '13px' }}
+                              value={incidentCustomLocation}
+                              onChange={(e) => setIncidentCustomLocation(e.target.value)}
+                              required={incidentLocation === 'Other'}
+                            />
+                          </div>
+                        )}
+
+                        {/* Priority / Severity Level */}
+                        <div className="form-group">
+                          <label className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px', fontWeight: '600' }}>
+                            Priority & Urgency Level *
+                          </label>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                            {[
+                              { level: 'Critical', desc: 'Blocked Lane / Emergency', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' },
+                              { level: 'High', desc: 'Severe Delay / Risk', color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)' },
+                              { level: 'Moderate', desc: 'Moderate Flow Issue', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
+                              { level: 'Low', desc: 'Minor Advisory', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.15)' },
+                            ].map(p => (
+                              <button
+                                key={p.level}
+                                type="button"
+                                onClick={() => setIncidentPriority(p.level)}
+                                style={{
+                                  padding: '10px 8px',
+                                  borderRadius: '8px',
+                                  background: incidentPriority === p.level ? p.bg : 'rgba(255,255,255,0.03)',
+                                  border: incidentPriority === p.level ? `1.5px solid ${p.color}` : '1px solid rgba(255,255,255,0.08)',
+                                  color: incidentPriority === p.level ? p.color : 'rgba(255,255,255,0.6)',
+                                  cursor: 'pointer',
+                                  textAlign: 'center',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                <div style={{ fontSize: '13px', fontWeight: '700' }}>{p.level}</div>
+                                <div style={{ fontSize: '10px', marginTop: '2px', opacity: 0.8 }}>{p.desc}</div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Situation Description */}
+                        <div className="form-group">
+                          <label className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px', fontWeight: '600' }}>
+                            Situation Details & Landmark Description *
+                          </label>
+                          <textarea
+                            className="form-control"
+                            rows={3}
+                            placeholder="Detail what is happening (e.g. damaged signal light flashing red, two vehicles collided on left lane, traffic backed up 200m)..."
+                            style={{ background: '#09111e', border: '1px solid var(--admin-border)', color: 'white', fontSize: '13px', resize: 'vertical' }}
+                            value={incidentDesc}
+                            onChange={(e) => setIncidentDesc(e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        {/* Reporter Details */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                          <div className="form-group">
+                            <label className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px', fontWeight: '600' }}>
+                              Reporter Name
+                            </label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              value={currentUser?.name || 'Public Citizen'}
+                              disabled
+                              style={{ background: '#070c16', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px', fontWeight: '600' }}>
+                              Contact Phone (Optional)
+                            </label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="e.g. +91 98765 43210"
+                              value={incidentPhone || currentUser?.phone || ''}
+                              onChange={(e) => setIncidentPhone(e.target.value)}
+                              style={{ background: '#09111e', border: '1px solid var(--admin-border)', color: 'white', fontSize: '13px' }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Submit Button */}
+                        <button
+                          type="submit"
+                          disabled={isSubmittingIncident}
+                          className="btn btn-primary"
+                          style={{
+                            height: '46px',
+                            justifyContent: 'center',
+                            fontSize: '14px',
+                            fontWeight: '700',
+                            background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                            borderColor: '#ef4444',
+                            marginTop: '8px',
+                            boxShadow: '0 4px 15px rgba(239, 68, 68, 0.3)',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <AlertTriangle size={16} />
+                          {isSubmittingIncident ? 'Transmitting to Command Center...' : 'Dispatch Incident Alert to Controllers & Admin'}
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* Right: Protocol & Helplines */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      <div className="admin-panel" style={{ padding: '20px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                          <Shield size={20} style={{ color: 'var(--admin-accent-cyan)' }} />
+                          <h3 style={{ fontSize: '15px', fontWeight: '700', margin: 0 }}>Incident Response Protocol</h3>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '12.5px', color: 'rgba(255,255,255,0.7)' }}>
+                          <div style={{ display: 'flex', gap: '10px' }}>
+                            <span style={{ color: '#06b6d4', fontWeight: '700' }}>1.</span>
+                            <span><strong>Direct Telemetry Broadcast:</strong> As soon as you click dispatch, an alert pops up on the active Traffic Operator's terminal and System Admin console.</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '10px' }}>
+                            <span style={{ color: '#06b6d4', fontWeight: '700' }}>2.</span>
+                            <span><strong>Controller Verification:</strong> The assigned junction operator verifies the report and overrides signal cycles to clear congestion or dispatch field units.</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '10px' }}>
+                            <span style={{ color: '#06b6d4', fontWeight: '700' }}>3.</span>
+                            <span><strong>Status Tracking:</strong> Follow your report's progression from Pending to Verified & Resolved in real time below.</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="admin-panel" style={{ padding: '20px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                          <AlertTriangle size={18} style={{ color: '#f59e0b' }} />
+                          <h3 style={{ fontSize: '15px', fontWeight: '700', margin: 0 }}>Emergency Helplines</h3>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12px' }}>
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px' }}>
+                            <div style={{ color: 'var(--admin-text-muted)' }}>Traffic Control</div>
+                            <div style={{ fontSize: '14px', fontWeight: '700', color: 'white', marginTop: '2px' }}>103 / 112</div>
+                          </div>
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px' }}>
+                            <div style={{ color: 'var(--admin-text-muted)' }}>Ambulance Dispatch</div>
+                            <div style={{ fontSize: '14px', fontWeight: '700', color: '#ef4444', marginTop: '2px' }}>108</div>
+                          </div>
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px' }}>
+                            <div style={{ color: 'var(--admin-text-muted)' }}>Highway Patrol</div>
+                            <div style={{ fontSize: '14px', fontWeight: '700', color: 'white', marginTop: '2px' }}>1033</div>
+                          </div>
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px' }}>
+                            <div style={{ color: 'var(--admin-text-muted)' }}>Road Breakdown</div>
+                            <div style={{ fontSize: '14px', fontWeight: '700', color: '#f59e0b', marginTop: '2px' }}>1073</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom: Live Incident Status Tracker */}
+                  <div className="admin-panel" style={{ padding: '24px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                      <div>
+                        <h2 style={{ fontSize: '16px', fontWeight: '700', color: 'white', margin: 0 }}>City Incident Feed & Verification Status</h2>
+                        <p style={{ fontSize: '12px', color: 'var(--admin-text-muted)', margin: '4px 0 0' }}>Live status of community-reported disruptions and response actions taken by traffic controllers.</p>
+                      </div>
+                      <button
+                        onClick={fetchPublicIncidents}
+                        className="btn btn-ghost btn-sm"
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', borderColor: 'var(--admin-border)' }}
+                      >
+                        <RefreshCw size={13} />
+                        Refresh Feed
+                      </button>
+                    </div>
+
+                    {publicIncidents.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '36px', color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+                        No incidents reported yet. All corridors clear.
+                      </div>
+                    ) : (
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                          <thead>
+                            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)', fontSize: '11px', textTransform: 'uppercase' }}>
+                              <th style={{ padding: '10px 14px' }}>ID</th>
+                              <th style={{ padding: '10px 14px' }}>Type</th>
+                              <th style={{ padding: '10px 14px' }}>Location</th>
+                              <th style={{ padding: '10px 14px' }}>Priority</th>
+                              <th style={{ padding: '10px 14px' }}>Reported By</th>
+                              <th style={{ padding: '10px 14px' }}>Time</th>
+                              <th style={{ padding: '10px 14px' }}>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {publicIncidents.map(inc => (
+                              <tr key={inc.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                <td style={{ padding: '12px 14px', fontFamily: 'monospace', color: '#06b6d4', fontWeight: '700' }}>{inc.id}</td>
+                                <td style={{ padding: '12px 14px', fontWeight: '600' }}>{inc.type}</td>
+                                <td style={{ padding: '12px 14px', color: 'rgba(255,255,255,0.85)' }}>{inc.location}</td>
+                                <td style={{ padding: '12px 14px' }}>
+                                  <span style={{
+                                    padding: '2px 8px',
+                                    borderRadius: '10px',
+                                    fontSize: '11px',
+                                    fontWeight: '700',
+                                    background: inc.priority === 'Critical' ? 'rgba(239, 68, 68, 0.15)' : inc.priority === 'High' ? 'rgba(249, 115, 22, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                    color: inc.priority === 'Critical' ? '#ef4444' : inc.priority === 'High' ? '#f97316' : '#f59e0b',
+                                    border: `1px solid ${inc.priority === 'Critical' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`
+                                  }}>
+                                    {inc.priority}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '12px 14px', color: 'rgba(255,255,255,0.6)' }}>{inc.reportedBy}</td>
+                                <td style={{ padding: '12px 14px', color: 'rgba(255,255,255,0.4)', fontSize: '11.5px' }}>{inc.time}</td>
+                                <td style={{ padding: '12px 14px' }}>
+                                  <span style={{
+                                    padding: '3px 10px',
+                                    borderRadius: '12px',
+                                    fontSize: '11.5px',
+                                    fontWeight: '700',
+                                    background: inc.status === 'Resolved' ? 'rgba(16, 185, 129, 0.15)' : inc.status === 'Verified' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                    color: inc.status === 'Resolved' ? '#10b981' : inc.status === 'Verified' ? '#3b82f6' : '#f59e0b',
+                                    border: `1px solid ${inc.status === 'Resolved' ? '#10b981' : inc.status === 'Verified' ? '#3b82f6' : '#f59e0b'}`
+                                  }}>
+                                    ● {inc.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {['notifications', 'profile'].includes(publicActiveTab) && (
                 <div style={{ padding: '60px', textAlign: 'center' }} className="admin-panel page-enter">
                   <div style={{ fontSize: '48px', marginBottom: '16px' }}>🗺️</div>
                   <h2 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--admin-text-main)' }}>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import SimulationCanvas from './SimulationCanvas'
 import {
   Sliders, Route, Users, Activity, FileText, 
@@ -21,6 +21,8 @@ export default function OperatorDashboard({
   const [incidents, setIncidents] = useState([])
   const [auditLogs, setAuditLogs] = useState([])
   const [localIntersections, setLocalIntersections] = useState([])
+  const knownIncidentIdsRef = useRef(new Set())
+  const isInitialFetchRef = useRef(true)
   
   // Form/Modal States
   const [showModal, setShowModal] = useState(null) // 'incident'
@@ -75,6 +77,17 @@ export default function OperatorDashboard({
       if (resInc.ok) {
         const dataInc = await resInc.json()
         setIncidents(dataInc)
+        
+        // Alert controller in real-time when new incident arrives
+        dataInc.forEach(inc => {
+          if (!knownIncidentIdsRef.current.has(inc.id)) {
+            knownIncidentIdsRef.current.add(inc.id)
+            if (!isInitialFetchRef.current && (inc.status || '').toLowerCase() === 'pending') {
+              addToast(`🚨 Incident Alert: ${inc.type} at ${inc.location} (Priority: ${inc.priority})!`, 'error')
+            }
+          }
+        })
+        isInitialFetchRef.current = false
       }
 
       const resLogs = await fetch('http://localhost:8000/api/logs')
@@ -97,7 +110,13 @@ export default function OperatorDashboard({
     const timer = setInterval(() => {
       setSysTime(new Date().toLocaleTimeString())
     }, 1000)
-    return () => clearInterval(timer)
+    const pollInterval = setInterval(() => {
+      fetchData()
+    }, 4000)
+    return () => {
+      clearInterval(timer)
+      clearInterval(pollInterval)
+    }
   }, [])
 
   const handleMetricsUpdate = (metrics) => {
@@ -589,7 +608,19 @@ export default function OperatorDashboard({
                 }}
               >
                 {item.icon}
-                {item.label}
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {item.id === 'incidents' && incidents.filter(i => (i.status || '').toLowerCase() === 'pending').length > 0 && (
+                  <span style={{
+                    padding: '2px 7px',
+                    borderRadius: 10,
+                    background: '#ef4444',
+                    color: 'white',
+                    fontSize: 11,
+                    fontWeight: 800
+                  }}>
+                    {incidents.filter(i => (i.status || '').toLowerCase() === 'pending').length}
+                  </span>
+                )}
               </button>
             )
           })}
@@ -1094,6 +1125,8 @@ export default function OperatorDashboard({
                       <th style={{ padding: '12px 16px' }}>ID</th>
                       <th style={{ padding: '12px 16px' }}>Location</th>
                       <th style={{ padding: '12px 16px' }}>Incident Type</th>
+                      <th style={{ padding: '12px 16px' }}>Priority</th>
+                      <th style={{ padding: '12px 16px' }}>Details</th>
                       <th style={{ padding: '12px 16px' }}>Reporter</th>
                       <th style={{ padding: '12px 16px' }}>Status</th>
                       <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
@@ -1108,21 +1141,37 @@ export default function OperatorDashboard({
                           <span style={{
                             padding: '3px 8px',
                             borderRadius: 4,
-                            background: inc.type === 'Accident' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                            color: inc.type === 'Accident' ? '#ef4444' : '#f59e0b',
+                            background: inc.type.toLowerCase().includes('accident') ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                            color: inc.type.toLowerCase().includes('accident') ? '#ef4444' : '#f59e0b',
                             fontSize: 11,
                             fontWeight: 700
                           }}>
                             {inc.type}
                           </span>
                         </td>
+                        <td style={{ padding: '16px' }}>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: 10,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            background: inc.priority === 'Critical' ? 'rgba(239, 68, 68, 0.15)' : inc.priority === 'High' ? 'rgba(249, 115, 22, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                            color: inc.priority === 'Critical' ? '#ef4444' : inc.priority === 'High' ? '#f97316' : '#f59e0b',
+                            border: `1px solid ${inc.priority === 'Critical' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`
+                          }}>
+                            {inc.priority || 'Moderate'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '16px', color: 'rgba(255,255,255,0.7)', fontSize: 12.5, maxWidth: 220 }}>
+                          {inc.description || 'No additional details provided.'}
+                        </td>
                         <td style={{ padding: '16px' }}>{inc.reportedBy}</td>
                         <td style={{ padding: '16px' }}>
                           <span style={{
                             padding: '3px 8px',
                             borderRadius: 12,
-                            background: inc.status === 'Pending' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(16, 185, 129, 0.12)',
-                            color: inc.status === 'Pending' ? '#f59e0b' : '#10b981',
+                            background: (inc.status || '').toLowerCase() === 'pending' ? 'rgba(245, 158, 11, 0.12)' : (inc.status || '').toLowerCase() === 'verified' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.12)',
+                            color: (inc.status || '').toLowerCase() === 'pending' ? '#f59e0b' : (inc.status || '').toLowerCase() === 'verified' ? '#3b82f6' : '#10b981',
                             fontSize: 12,
                             fontWeight: 700
                           }}>
@@ -1130,25 +1179,33 @@ export default function OperatorDashboard({
                           </span>
                         </td>
                         <td style={{ padding: '16px', textAlign: 'right' }}>
-                          {inc.status.toLowerCase() === 'pending' ? (
+                          {(inc.status || '').toLowerCase() === 'pending' ? (
                             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                               <button
                                 onClick={() => handleVerifyIncident(inc.id.replace('INC-', ''), 'VERIFIED')}
                                 className="btn btn-primary"
-                                style={{ padding: '6px 12px', fontSize: 11, background: '#10b981', borderColor: '#10b981' }}
+                                style={{ padding: '6px 12px', fontSize: 11, background: '#10b981', borderColor: '#10b981', cursor: 'pointer' }}
                               >
                                 Verify & Dispatch
                               </button>
                               <button
                                 onClick={() => handleVerifyIncident(inc.id.replace('INC-', ''), 'RESOLVED')}
                                 className="btn btn-ghost"
-                                style={{ padding: '6px 12px', fontSize: 11, borderColor: 'rgba(255,255,255,0.1)' }}
+                                style={{ padding: '6px 12px', fontSize: 11, borderColor: 'rgba(255,255,255,0.1)', cursor: 'pointer' }}
                               >
-                                Reject/Clear
+                                Clear
                               </button>
                             </div>
+                          ) : (inc.status || '').toLowerCase() === 'verified' ? (
+                            <button
+                              onClick={() => handleVerifyIncident(inc.id.replace('INC-', ''), 'RESOLVED')}
+                              className="btn btn-primary"
+                              style={{ padding: '6px 12px', fontSize: 11, background: '#06b6d4', borderColor: '#06b6d4', cursor: 'pointer' }}
+                            >
+                              Mark Resolved
+                            </button>
                           ) : (
-                            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>Verified & Logged</span>
+                            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>Resolved ✓</span>
                           )}
                         </td>
                       </tr>

@@ -128,7 +128,7 @@ export default function AdminDashboard({
 
         // Detect newly arrived unread notifications
         notifs.forEach(n => {
-          if (!n.is_read && (n.type === 'OPERATOR_OFFLINE' || n.type === 'OPERATOR_ONLINE')) {
+          if (!n.is_read && (n.type === 'OPERATOR_OFFLINE' || n.type === 'OPERATOR_ONLINE' || n.type === 'INCIDENT_REPORTED')) {
             if (!knownNotifIdsRef.current.has(n.id)) {
               knownNotifIdsRef.current.add(n.id)
               if (!isInitialNotifFetch.current) {
@@ -136,12 +136,11 @@ export default function AdminDashboard({
                   addToast(`⚠️ Operator ${n.operator_name} went OFFLINE from ${n.intersection_name}! Please assign a replacement.`, 'warning')
                 } else if (n.type === 'OPERATOR_ONLINE') {
                   addToast(`🟢 Traffic Controller ${n.operator_name} is now back ONLINE${n.intersection_name && n.intersection_name !== 'Unassigned' ? ` at ${n.intersection_name}` : ''}!`, 'success')
+                } else if (n.type === 'INCIDENT_REPORTED') {
+                  addToast(`🚨 Incident Reported: ${n.title} - ${n.intersection_name}`, 'error')
                 }
-                // Refresh operator list so duty status updates immediately
-                fetch('http://localhost:8000/api/operators')
-                  .then(r => r.json())
-                  .then(dataOp => setOperators(dataOp))
-                  .catch(() => {})
+                // Refresh operational lists
+                fetchData()
               }
             }
           }
@@ -478,7 +477,14 @@ export default function AdminDashboard({
     addToast('Successfully generated and downloaded audit log report file.', 'success')
   }
 
-  const handleIncidentResolve = (incId) => {
+  const handleIncidentResolve = async (incId) => {
+    try {
+      await fetch(`http://localhost:8000/api/incidents/${incId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'RESOLVED', verified_by: currentUser?.name || 'Sys Admin' })
+      })
+    } catch (e) {}
     setIncidents(prev => prev.map(inc => {
       if (inc.id === incId) {
         return { ...inc, status: 'Resolved' }
@@ -490,7 +496,14 @@ export default function AdminDashboard({
     addToast(`Incident ${incId} marked as resolved.`, 'success')
   }
 
-  const handleIncidentVerify = (incId) => {
+  const handleIncidentVerify = async (incId) => {
+    try {
+      await fetch(`http://localhost:8000/api/incidents/${incId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'VERIFIED', verified_by: currentUser?.name || 'Sys Admin' })
+      })
+    } catch (e) {}
     setIncidents(prev => prev.map(inc => {
       if (inc.id === incId) {
         return { ...inc, status: 'Verifying' }
@@ -843,6 +856,7 @@ export default function AdminDashboard({
                         return visibleNotifications.map(notif => {
                           const isOfflineAlert = notif.type === 'OPERATOR_OFFLINE'
                           const isOnlineAlert = notif.type === 'OPERATOR_ONLINE'
+                          const isIncidentAlert = notif.type === 'INCIDENT_REPORTED'
 
                           let cardBg = notif.is_read ? 'rgba(255,255,255,0.02)' : 'rgba(6, 182, 212, 0.08)'
                           let cardBorder = notif.is_read ? 'rgba(255,255,255,0.04)' : 'rgba(6, 182, 212, 0.25)'
@@ -862,6 +876,12 @@ export default function AdminDashboard({
                             iconBg = 'rgba(16, 185, 129, 0.15)'
                             iconColor = '#10b981'
                             titleColor = notif.is_read ? 'rgba(255,255,255,0.85)' : '#10b981'
+                          } else if (isIncidentAlert) {
+                            cardBg = notif.is_read ? 'rgba(255,255,255,0.02)' : 'rgba(239, 68, 68, 0.08)'
+                            cardBorder = notif.is_read ? 'rgba(255,255,255,0.04)' : 'rgba(239, 68, 68, 0.25)'
+                            iconBg = 'rgba(239, 68, 68, 0.15)'
+                            iconColor = '#ef4444'
+                            titleColor = notif.is_read ? 'rgba(255,255,255,0.85)' : '#ef4444'
                           }
 
                           return (
@@ -885,7 +905,7 @@ export default function AdminDashboard({
                                   flexShrink: 0,
                                   marginTop: 2
                                 }}>
-                                  {isOfflineAlert ? <AlertTriangle size={15} /> : (isOnlineAlert ? <CheckCircle size={15} /> : <Info size={15} />)}
+                                  {isOfflineAlert ? <AlertTriangle size={15} /> : (isOnlineAlert ? <CheckCircle size={15} /> : (isIncidentAlert ? <AlertTriangle size={15} /> : <Info size={15} />))}
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -937,6 +957,32 @@ export default function AdminDashboard({
                                         <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} />
                                         Active On Duty
                                       </span>
+                                    )}
+                                    {isIncidentAlert && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setActiveTab('incidents')
+                                          setShowNotifDropdown(false)
+                                          handleMarkNotificationRead(notif.id)
+                                        }}
+                                        style={{
+                                          padding: '5px 12px',
+                                          borderRadius: 6,
+                                          background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                                          border: 'none',
+                                          color: 'white',
+                                          fontSize: 11.5,
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: 6
+                                        }}
+                                      >
+                                        <AlertTriangle size={13} />
+                                        View Incident
+                                      </button>
                                     )}
                                     {!notif.is_read && (
                                       <button
