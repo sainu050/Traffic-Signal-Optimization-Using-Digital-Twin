@@ -5,7 +5,8 @@ export default function SimulationCanvas({ onMetricsUpdate }) {
   const [simulationState, setSimulationState] = useState({
     signals: { horizontal: 'green', vertical: 'red' },
     timers: { horizontal: 12, vertical: 15 },
-    vehicles: []
+    vehicles: [],
+    pedestrians: []
   })
   const [isConnected, setIsConnected] = useState(false)
 
@@ -148,6 +149,33 @@ export default function SimulationCanvas({ onMetricsUpdate }) {
     ctx.moveTo(260, 340)
     ctx.lineTo(300, 340)
     ctx.stroke()
+
+    // 4b. Draw Zebra Crossings (Pedestrian Crosswalks)
+    const drawZebraStripes = (isVerticalRoad, roadStart, roadEnd, crossCenter, stripeLength = 16, stripeWidth = 6, gap = 4) => {
+      ctx.save()
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.82)'
+      if (isVerticalRoad) {
+        // Vertical road approach (crossing runs horizontally)
+        for (let x = roadStart + 3; x + stripeWidth <= roadEnd; x += stripeWidth + gap) {
+          ctx.fillRect(x, crossCenter - stripeLength / 2, stripeWidth, stripeLength)
+        }
+      } else {
+        // Horizontal road approach (crossing runs vertically)
+        for (let y = roadStart + 3; y + stripeWidth <= roadEnd; y += stripeWidth + gap) {
+          ctx.fillRect(crossCenter - stripeLength / 2, y, stripeLength, stripeWidth)
+        }
+      }
+      ctx.restore()
+    }
+
+    // North Crossing (SUMO y = 314 -> Canvas y = 230, road x: 260 to 340)
+    drawZebraStripes(true, 260, 340, 230)
+    // South Crossing (SUMO y = 286 -> Canvas y = 370, road x: 260 to 340)
+    drawZebraStripes(true, 260, 340, 370)
+    // East Crossing (SUMO x = 314 -> Canvas x = 370, road y: 260 to 340)
+    drawZebraStripes(false, 260, 340, 370)
+    // West Crossing (SUMO x = 286 -> Canvas x = 230, road y: 260 to 340)
+    drawZebraStripes(false, 260, 340, 230)
 
     // 5. Draw Detailed Traffic Light Housings (Red, Yellow, Green stacked) with LED Timer
     const drawRealTrafficLight = (cx, cy, state, remainingSeconds) => {
@@ -670,7 +698,83 @@ export default function SimulationCanvas({ onMetricsUpdate }) {
       ctx.restore()
     })
 
-    // 7. Status & Active Fleet Mix Legend
+    // 7. Draw Simulated Pedestrians at Crossings
+    const pedestrians = simulationState.pedestrians || []
+    pedestrians.forEach((ped) => {
+      ctx.save()
+      const scale = 5.0
+      const canvasX = 300 + (ped.x - 300) * scale
+      const canvasY = 300 - (ped.y - 300) * scale
+
+      ctx.translate(canvasX, canvasY)
+
+      const isWaiting = ped.state === 'WAITING'
+      const isCrossing = ped.state === 'CROSSING'
+
+      // WAITING: Amber/Orange (#f59e0b) - stationary at sidewalk curb
+      // CROSSING: Vibrant Cyan/Emerald (#06b6d4) - moving across crosswalk
+      const pedColor = isWaiting ? '#f59e0b' : '#06b6d4'
+
+      if (isCrossing) {
+        ctx.shadowBlur = 6
+        ctx.shadowColor = 'rgba(6, 182, 212, 0.5)'
+      }
+
+      // 1. Head (proportional circle)
+      ctx.fillStyle = pedColor
+      ctx.beginPath()
+      ctx.arc(0, -5.5, 2.5, 0, 2 * Math.PI)
+      ctx.fill()
+
+      // 2. Torso (stick spine)
+      ctx.strokeStyle = pedColor
+      ctx.lineWidth = 1.8
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.moveTo(0, -3)
+      ctx.lineTo(0, 2)
+      ctx.stroke()
+
+      // 3. Arms
+      ctx.beginPath()
+      if (isWaiting) {
+        ctx.moveTo(-3, 0)
+        ctx.lineTo(0, -2)
+        ctx.lineTo(3, 0)
+      } else {
+        const swing = Math.sin(Date.now() / 150 + ped.x) * 3
+        ctx.moveTo(-2.5, -2 + swing)
+        ctx.lineTo(0, -2)
+        ctx.lineTo(2.5, -2 - swing)
+      }
+      ctx.stroke()
+
+      // 4. Legs
+      ctx.beginPath()
+      if (isWaiting) {
+        ctx.moveTo(0, 2)
+        ctx.lineTo(-1.5, 6.5)
+        ctx.moveTo(0, 2)
+        ctx.lineTo(1.5, 6.5)
+      } else {
+        const stride = Math.sin(Date.now() / 150 + ped.x) * 3.5
+        ctx.moveTo(0, 2)
+        ctx.lineTo(-stride, 6.5)
+        ctx.moveTo(0, 2)
+        ctx.lineTo(stride, 6.5)
+      }
+      ctx.stroke()
+
+      // 5. State indicator tag (WAIT / WALK)
+      ctx.fillStyle = isWaiting ? 'rgba(245, 158, 11, 0.9)' : 'rgba(6, 182, 212, 0.9)'
+      ctx.font = 'bold 7.5px monospace'
+      ctx.textAlign = 'center'
+      ctx.fillText(isWaiting ? 'WAIT' : 'WALK', 0, -9)
+
+      ctx.restore()
+    })
+
+    // 8. Status & Active Fleet Mix Legend
     ctx.fillStyle = isConnected ? '#10b981' : '#ef4444'
     ctx.beginPath()
     ctx.arc(20, 20, 5, 0, 2 * Math.PI)
@@ -679,6 +783,26 @@ export default function SimulationCanvas({ onMetricsUpdate }) {
     ctx.fillStyle = 'rgba(255,255,255,0.75)'
     ctx.font = 'bold 10px monospace'
     ctx.fillText(isConnected ? 'LIVE SUMO TWIN (SPEED: 2X)' : 'DISCONNECTED', 32, 23)
+
+    // Pedestrian status badge in top right
+    if (pedestrians.length > 0) {
+      const waitingCount = pedestrians.filter(p => p.state === 'WAITING').length
+      const crossingCount = pedestrians.filter(p => p.state === 'CROSSING').length
+      ctx.save()
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)'
+      ctx.strokeStyle = 'rgba(6, 182, 212, 0.3)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.roundRect(420, 10, 166, 22, 5)
+      ctx.fill()
+      ctx.stroke()
+
+      ctx.fillStyle = '#38bdf8'
+      ctx.font = 'bold 9.5px monospace'
+      ctx.textAlign = 'center'
+      ctx.fillText(`🚶 Pedestrians: ${waitingCount} Wait | ${crossingCount} Cross`, 503, 24)
+      ctx.restore()
+    }
 
     // Vehicle Types Legend banner
     ctx.fillStyle = 'rgba(15, 23, 42, 0.85)'
@@ -691,7 +815,7 @@ export default function SimulationCanvas({ onMetricsUpdate }) {
 
     ctx.font = '9.5px sans-serif'
     ctx.fillStyle = 'rgba(255, 255, 255, 0.75)'
-    ctx.fillText('Fleet: 🚗 Cars • 🏍️ Bikes • 🛺 Auto-Rickshaws • 🚙 SUVs • 🚌 Buses • 🚛 Cargo Trucks • 🚑 Ambulances', 22, 582)
+    ctx.fillText('Fleet: 🚗 Cars • 🏍️ Bikes • 🛺 Auto-Rickshaws • 🚙 SUVs • 🚌 Buses • 🚛 Trucks • 🚑 Ambulances • 🚶 Pedestrians', 22, 582)
 
   }, [simulationState, isConnected])
 

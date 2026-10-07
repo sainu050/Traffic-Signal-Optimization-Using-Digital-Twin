@@ -2,7 +2,6 @@ DROP TABLE IF EXISTS admin_notifications CASCADE;
 DROP TABLE IF EXISTS report CASCADE;
 DROP TABLE IF EXISTS incident CASCADE;
 DROP TABLE IF EXISTS manualoverride CASCADE;
-DROP TABLE IF EXISTS adaptivecontroller CASCADE;
 DROP TABLE IF EXISTS trafficsignal CASCADE;
 DROP TABLE IF EXISTS trafficdata CASCADE;
 DROP TABLE IF EXISTS operatorassignment CASCADE;
@@ -68,17 +67,7 @@ CREATE TABLE trafficsignal (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 6. Create ADAPTIVECONTROLLER table
-CREATE TABLE adaptivecontroller (
-    controller_id SERIAL PRIMARY KEY,
-    intersection_id INT REFERENCES intersections(intersection_id) ON DELETE CASCADE,
-    density_threshold FLOAT,
-    queue_threshold INT,
-    recommended_green INT,
-    recommendation_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 7. Create MANUALOVERRIDE table
+-- 6. Create MANUALOVERRIDE table
 CREATE TABLE manualoverride (
     override_id SERIAL PRIMARY KEY,
     operator_id INT REFERENCES users(user_id) ON DELETE SET NULL,
@@ -89,7 +78,7 @@ CREATE TABLE manualoverride (
     status VARCHAR(20) DEFAULT 'Active'
 );
 
--- 8. Create INCIDENT table
+-- 7. Create INCIDENT table
 CREATE TABLE incident (
     incident_id SERIAL PRIMARY KEY,
     reported_by INT REFERENCES users(user_id) ON DELETE SET NULL,
@@ -102,7 +91,7 @@ CREATE TABLE incident (
     verified_by INT REFERENCES users(user_id) ON DELETE SET NULL
 );
 
--- 9. Create REPORT table
+-- 8. Create REPORT table
 CREATE TABLE report (
     report_id SERIAL PRIMARY KEY,
     generated_by INT REFERENCES users(user_id) ON DELETE SET NULL,
@@ -159,7 +148,7 @@ INSERT INTO incident (reported_by, intersection_id, type, description, location,
 (3, 1, 'Accident', 'Minor two-car collision blocking the left turning lane from North.', 'Baker Jn - North Leg', 'PENDING'),
 (3, 5, 'Roadblock', 'Construction barricades blocking traffic near bypass loop.', 'Airport Rd & Ring Rd', 'RESOLVED');
 
--- 11. Create ADMIN_NOTIFICATIONS table
+-- 9. Create ADMIN_NOTIFICATIONS table
 CREATE TABLE admin_notifications (
     id SERIAL PRIMARY KEY,
     title VARCHAR(100) NOT NULL,

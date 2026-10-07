@@ -49,6 +49,8 @@ export default function OperatorDashboard({
   const [overrideGreen, setOverrideGreen] = useState(45)
   const [overrideRed, setOverrideRed] = useState(60)
   const [overrideDirection, setOverrideDirection] = useState('north_green')
+  const [overrideReason, setOverrideReason] = useState('Traffic Congestion Relief')
+  const [manualOverridesList, setManualOverridesList] = useState([])
 
   // System States
   const [sumoSyncing, setSumoSyncing] = useState(false)
@@ -100,6 +102,14 @@ export default function OperatorDashboard({
           target: l.target
         })))
       }
+
+      try {
+        const resMO = await fetch('http://localhost:8000/api/manual-overrides')
+        if (resMO.ok) {
+          const dataMO = await resMO.json()
+          setManualOverridesList(dataMO.overrides || [])
+        }
+      } catch {}
     } catch (err) {
       console.error("Fetch operational database resources failed: ", err)
     }
@@ -182,7 +192,9 @@ export default function OperatorDashboard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           wait: parseInt(overrideGreen),
-          signal: overrideDirection
+          signal: overrideDirection,
+          reason: overrideReason.trim() || 'Manual directional phase lock',
+          operator_id: currentUser?.id || currentUser?.user_id || 2
         })
       })
       const data = await res.json()
@@ -1141,8 +1153,20 @@ export default function OperatorDashboard({
                           <span style={{
                             padding: '3px 8px',
                             borderRadius: 4,
-                            background: inc.type.toLowerCase().includes('accident') ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                            color: inc.type.toLowerCase().includes('accident') ? '#ef4444' : '#f59e0b',
+                            background: inc.type.toLowerCase().includes('speed')
+                              ? 'rgba(6, 182, 212, 0.15)'
+                              : inc.type.toLowerCase().includes('rash')
+                              ? 'rgba(236, 72, 153, 0.15)'
+                              : inc.type.toLowerCase().includes('accident')
+                              ? 'rgba(239, 68, 68, 0.15)'
+                              : 'rgba(245, 158, 11, 0.15)',
+                            color: inc.type.toLowerCase().includes('speed')
+                              ? '#06b6d4'
+                              : inc.type.toLowerCase().includes('rash')
+                              ? '#f43f5e'
+                              : inc.type.toLowerCase().includes('accident')
+                              ? '#ef4444'
+                              : '#f59e0b',
                             fontSize: 11,
                             fontWeight: 700
                           }}>
@@ -1155,9 +1179,9 @@ export default function OperatorDashboard({
                             borderRadius: 10,
                             fontSize: 11,
                             fontWeight: 700,
-                            background: inc.priority === 'Critical' ? 'rgba(239, 68, 68, 0.15)' : inc.priority === 'High' ? 'rgba(249, 115, 22, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                            color: inc.priority === 'Critical' ? '#ef4444' : inc.priority === 'High' ? '#f97316' : '#f59e0b',
-                            border: `1px solid ${inc.priority === 'Critical' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`
+                            background: inc.priority === 'Critical' ? 'rgba(239, 68, 68, 0.15)' : (inc.priority === 'High' || inc.priority === 'Heavy') ? 'rgba(249, 115, 22, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                            color: inc.priority === 'Critical' ? '#ef4444' : (inc.priority === 'High' || inc.priority === 'Heavy') ? '#f97316' : '#f59e0b',
+                            border: `1px solid ${inc.priority === 'Critical' ? 'rgba(239, 68, 68, 0.3)' : (inc.priority === 'High' || inc.priority === 'Heavy') ? 'rgba(249, 115, 22, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`
                           }}>
                             {inc.priority || 'Moderate'}
                           </span>
@@ -1269,6 +1293,16 @@ export default function OperatorDashboard({
                       style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white' }}
                     />
                   </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Operational Reason / Protocol Note</label>
+                    <input
+                      type="text"
+                      value={overrideReason}
+                      onChange={(e) => setOverrideReason(e.target.value)}
+                      placeholder="e.g. Heavy queue clearance / Ambulance corridor / Roadwork"
+                      style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white' }}
+                    />
+                  </div>
                   <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: 12, fontWeight: 700, marginTop: 8 }}>
                     Inject Override Sequence
                   </button>
@@ -1342,6 +1376,94 @@ export default function OperatorDashboard({
                   </tbody>
                 </table>
               </div>
+            </div>
+
+            {/* Manual Overrides Audit History (PostgreSQL manualoverride Table) */}
+            <div style={{
+              background: '#111827',
+              border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: 16,
+              padding: 24,
+              gridColumn: '1 / -1'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>Manual Overrides Audit Ledger</span>
+                    <span style={{ fontSize: 11, background: 'rgba(6, 182, 212, 0.15)', color: '#06b6d4', padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
+                      DB: manualoverride
+                    </span>
+                  </h3>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: '4px 0 0' }}>
+                    Certified safety audit log of operator manual signal locks, session durations, and justifications.
+                  </p>
+                </div>
+                <button
+                  onClick={fetchData}
+                  className="btn btn-ghost btn-sm"
+                  style={{ fontSize: 12, padding: '4px 10px', borderColor: 'rgba(255,255,255,0.1)' }}
+                >
+                  Refresh Log
+                </button>
+              </div>
+
+              {manualOverridesList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '28px', color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>
+                  No manual overrides recorded in database yet. All signals operating under automated AI control.
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)', textAlign: 'left' }}>
+                        <th style={{ padding: '10px 14px' }}>Override ID</th>
+                        <th style={{ padding: '10px 14px' }}>Junction</th>
+                        <th style={{ padding: '10px 14px' }}>Operator</th>
+                        <th style={{ padding: '10px 14px' }}>Reason / Protocol</th>
+                        <th style={{ padding: '10px 14px' }}>Start Time</th>
+                        <th style={{ padding: '10px 14px' }}>End Time</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'right' }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {manualOverridesList.map(mo => {
+                        const isActive = mo.status === 'Active';
+                        const isCompleted = mo.status === 'Completed' || mo.status === 'Released';
+                        return (
+                          <tr key={mo.override_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                            <td style={{ padding: '12px 14px', fontWeight: 700, color: '#06b6d4', fontFamily: 'monospace' }}>
+                              OVR-{mo.override_id}
+                            </td>
+                            <td style={{ padding: '12px 14px', fontWeight: 600 }}>{mo.intersection_name}</td>
+                            <td style={{ padding: '12px 14px', color: 'rgba(255,255,255,0.8)' }}>{mo.operator_name}</td>
+                            <td style={{ padding: '12px 14px', color: 'rgba(255,255,255,0.7)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {mo.reason}
+                            </td>
+                            <td style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+                              {mo.start_time || '—'}
+                            </td>
+                            <td style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+                              {mo.end_time || '—'}
+                            </td>
+                            <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                              <span style={{
+                                padding: '3px 8px',
+                                borderRadius: 10,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                background: isActive ? 'rgba(239, 68, 68, 0.15)' : (isCompleted ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.08)'),
+                                color: isActive ? '#ef4444' : (isCompleted ? '#10b981' : 'rgba(255, 255, 255, 0.6)')
+                              }}>
+                                {mo.status}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}

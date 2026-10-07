@@ -9,6 +9,7 @@ else:
     sys.exit("ERROR: Please set SUMO_HOME environment variable.")
 
 import traci
+from pedestrian_manager import PedestrianManager
 
 class TrafficSimulation:
     def __init__(self):
@@ -24,6 +25,7 @@ class TrafficSimulation:
             "south": 30,
             "west": 45
         }
+        self.pedestrian_manager = PedestrianManager()
         self.sumo_started = False
         self.start_sumo()
 
@@ -37,6 +39,8 @@ class TrafficSimulation:
         # Kill any orphaned SUMO processes to free up port 8813
         if os.name == 'nt':
             os.system("taskkill /f /im sumo.exe >nul 2>&1")
+            import time
+            time.sleep(0.5)
             
         # Start SUMO in background via TraCI
         # --no-warnings suppresses console noise, --no-step-log disables step terminal logs
@@ -52,6 +56,7 @@ class TrafficSimulation:
 
     def reload(self):
         sumo_cfg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sumo_files", "sumo.sumocfg")
+        self.pedestrian_manager.reset()
         if self.sumo_started:
             try:
                 traci.load(["-c", sumo_cfg, "--no-warnings", "--no-step-log", "--step-length", "0.08"])
@@ -76,6 +81,7 @@ class TrafficSimulation:
         if not self.sumo_started:
             return
         try:
+            self.pedestrian_manager.step(self.signals, dt=0.08)
             traci.simulationStep()
         except Exception:
             # Attempt to restart SUMO if connection is lost
@@ -89,7 +95,17 @@ class TrafficSimulation:
     def get_state(self):
         vehicles = []
         if not self.sumo_started:
-            return {"signals": self.signals, "vehicles": [], "avg_wait": 0, "vehicle_count": 0}
+            return {
+                "signals": self.signals,
+                "vehicles": [],
+                "pedestrians": [],
+                "avg_wait": 0,
+                "vehicle_count": 0,
+                "active_pedestrians": 0,
+                "pedestrians_waiting": 0,
+                "pedestrians_crossing": 0,
+                "pedestrians_completed": 0
+            }
             
         total_wait = 0
         try:
@@ -151,10 +167,19 @@ class TrafficSimulation:
             
         avg_wait = total_wait / len(vehicles) if len(vehicles) > 0 else 0.0
             
+        ped_data = self.pedestrian_manager.get_pedestrians_data()
+        ped_metrics = self.pedestrian_manager.get_metrics()
+            
         return {
             "signals": self.signals,
             "timers": getattr(self, "signal_timers", {"horizontal": 12, "vertical": 15}),
             "vehicles": vehicles,
+            "pedestrians": ped_data,
+            "pedestrian_metrics": ped_metrics,
+            "active_pedestrians": ped_metrics["active_pedestrians"],
+            "pedestrians_waiting": ped_metrics["pedestrians_waiting"],
+            "pedestrians_crossing": ped_metrics["pedestrians_crossing"],
+            "pedestrians_completed": ped_metrics["pedestrians_completed"],
             "avg_wait": round(avg_wait, 1),
             "vehicle_count": len(vehicles)
         }

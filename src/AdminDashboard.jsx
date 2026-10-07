@@ -27,8 +27,8 @@ const initialCitizens = [
 const initialIncidents = [
   { id: 'INC-201', location: 'Main St & 1st Ave', type: 'Accident', priority: 'Critical', reportedBy: 'John Doe', status: 'Pending', time: '10m ago' },
   { id: 'INC-202', location: 'Airport Rd & Ring Rd', type: 'Roadblock', priority: 'Heavy', reportedBy: 'Sarah Chen', status: 'Verifying', time: '25m ago' },
-  { id: 'INC-203', location: 'Harbor Blvd & 5th', type: 'Breakdown', priority: 'Moderate', reportedBy: 'Jane Smith', status: 'Resolved', time: '1h ago' },
-  { id: 'INC-204', location: 'Park Rd & Central', type: 'Construction', priority: 'Heavy', reportedBy: 'David Miller', status: 'Pending', time: '2h ago' },
+  { id: 'INC-203', location: 'Baker Jn', type: 'Over-Speeding', priority: 'Heavy', reportedBy: 'Jane Smith', status: 'Pending', time: '35m ago' },
+  { id: 'INC-204', location: 'Park Rd & Central', type: 'Rash Driving', priority: 'Critical', reportedBy: 'David Miller', status: 'Verifying', time: '1h ago' },
 ]
 
 const initialLogs = [
@@ -319,7 +319,12 @@ export default function AdminDashboard({
     fetch(`http://localhost:8000/api/intersections/${targetId}/override`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wait: overrideGreen, signal: 'green' })
+      body: JSON.stringify({
+        wait: overrideGreen,
+        signal: 'green',
+        reason: 'Admin Central Timing Override',
+        operator_id: currentUser?.id || 1
+      })
     }).then(res => {
       if (res.ok) {
         const updated = localIntersections.map(item => {

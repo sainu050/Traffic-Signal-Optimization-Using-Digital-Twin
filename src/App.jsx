@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   TrafficCone, Rocket, LogIn, Eye, EyeOff, User, 
   UserCheck, Shield, Mail, Lock, Phone, MapPin, 
@@ -7,13 +7,257 @@ import {
   LayoutDashboard, Sliders, ToggleLeft, Layers, Settings,
   Search, FileText, Database, Server, HardDrive, Play,
   Pause, RefreshCw, Power, MessageSquare, HelpCircle,
-  Clock
+  Clock, ChevronDown, ChevronUp, Check, AlertOctagon,
+  Wrench, HardHat, ZapOff, Gauge, ShieldAlert, Grid, List,
+  CloudRain, ExternalLink, Filter, Calendar, Save, CheckCheck, Key
 } from 'lucide-react';
 import './App.css';
 import LandingPage from './LandingPage';
 import AdminDashboard from './AdminDashboard';
 import OperatorDashboard from './OperatorDashboard';
 import SimulationCanvas from './SimulationCanvas';
+
+// ══════════════════════════════════════════
+// INCIDENT REPORTING DEFINITIONS & DROPDOWN
+// ══════════════════════════════════════════
+
+// Official incident types for UrbanFlow incident reporting
+// Strictly NO EMOJIS - Clean SaaS design with subtle monochromatic Lucide icons
+export const INCIDENT_TYPES = [
+  { value: 'Accident', label: 'Accident', icon: AlertOctagon, color: '#ef4444' },
+  { value: 'Roadblock', label: 'Roadblock', icon: TrafficCone, color: '#f97316' },
+  { value: 'Vehicle Breakdown', label: 'Vehicle Breakdown', icon: Wrench, color: '#eab308' },
+  { value: 'Construction', label: 'Construction', icon: HardHat, color: '#f59e0b' },
+  { value: 'Road Hazard', label: 'Road Hazard', icon: AlertTriangle, color: '#eab308' },
+  { value: 'Signal Failure', label: 'Signal Failure', icon: ZapOff, color: '#8b5cf6' },
+  { value: 'Over-Speeding', label: 'Over-Speeding', icon: Gauge, color: '#06b6d4' },
+  { value: 'Rash Driving', label: 'Rash Driving', icon: ShieldAlert, color: '#ec4899' },
+];
+
+export const getIncidentTypeMeta = (type) => {
+  const normalized = (type || '').toLowerCase();
+  if (normalized.includes('speed')) {
+    return { label: 'Over-Speeding', icon: Gauge, color: '#06b6d4' };
+  }
+  if (normalized.includes('rash')) {
+    return { label: 'Rash Driving', icon: ShieldAlert, color: '#ec4899' };
+  }
+  if (normalized.includes('accident')) {
+    return { label: 'Accident', icon: AlertOctagon, color: '#ef4444' };
+  }
+  if (normalized.includes('roadblock')) {
+    return { label: 'Roadblock', icon: TrafficCone, color: '#f97316' };
+  }
+  if (normalized.includes('breakdown')) {
+    return { label: 'Vehicle Breakdown', icon: Wrench, color: '#eab308' };
+  }
+  if (normalized.includes('construction')) {
+    return { label: 'Construction', icon: HardHat, color: '#f59e0b' };
+  }
+  if (normalized.includes('hazard')) {
+    return { label: 'Road Hazard', icon: AlertTriangle, color: '#eab308' };
+  }
+  if (normalized.includes('signal')) {
+    return { label: 'Signal Failure', icon: ZapOff, color: '#8b5cf6' };
+  }
+  return { label: type || 'Incident', icon: AlertTriangle, color: '#f59e0b' };
+};
+
+// Accessible, modern SaaS Incident Type Dropdown
+function IncidentTypeSelect({ value, onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const containerRef = useRef(null);
+  const triggerRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [isOpen]);
+
+  const selectedItem = INCIDENT_TYPES.find(t => t.value === value);
+
+  const handleSelect = (item) => {
+    onChange(item.value);
+    setIsOpen(false);
+    triggerRef.current?.focus();
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!isOpen) {
+        setIsOpen(true);
+        const idx = INCIDENT_TYPES.findIndex(t => t.value === value);
+        setHighlightedIndex(idx >= 0 ? idx : 0);
+      } else {
+        setHighlightedIndex((prev) => (prev + 1) % INCIDENT_TYPES.length);
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!isOpen) {
+        setIsOpen(true);
+        const idx = INCIDENT_TYPES.findIndex(t => t.value === value);
+        setHighlightedIndex(idx >= 0 ? idx : INCIDENT_TYPES.length - 1);
+      } else {
+        setHighlightedIndex((prev) => (prev - 1 + INCIDENT_TYPES.length) % INCIDENT_TYPES.length);
+      }
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (!isOpen) {
+        setIsOpen(true);
+        const idx = INCIDENT_TYPES.findIndex(t => t.value === value);
+        setHighlightedIndex(idx >= 0 ? idx : 0);
+      } else {
+        if (highlightedIndex >= 0 && highlightedIndex < INCIDENT_TYPES.length) {
+          handleSelect(INCIDENT_TYPES[highlightedIndex]);
+        } else {
+          setIsOpen(false);
+        }
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsOpen(false);
+    } else if (e.key === 'Tab') {
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+      <button
+        ref={triggerRef}
+        type="button"
+        role="combobox"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-label="Incident Type"
+        onClick={() => {
+          const next = !isOpen;
+          setIsOpen(next);
+          if (next) {
+            const idx = INCIDENT_TYPES.findIndex(t => t.value === value);
+            setHighlightedIndex(idx >= 0 ? idx : 0);
+          }
+        }}
+        onKeyDown={handleKeyDown}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: isOpen ? '#0c1626' : '#09111e',
+          border: isOpen ? '1.5px solid var(--admin-accent-cyan)' : '1px solid var(--admin-border)',
+          borderRadius: '10px',
+          padding: '10px 14px',
+          color: 'white',
+          fontSize: '13.5px',
+          cursor: 'pointer',
+          outline: 'none',
+          boxShadow: isOpen ? '0 0 0 3px rgba(6, 182, 212, 0.15), 0 4px 12px rgba(0,0,0,0.3)' : 'none',
+          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+          textAlign: 'left'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {selectedItem ? (
+            <>
+              <selectedItem.icon size={15} style={{ color: selectedItem.color, flexShrink: 0 }} />
+              <span style={{ color: '#ffffff', fontWeight: '600' }}>{selectedItem.label}</span>
+            </>
+          ) : (
+            <span style={{ color: 'rgba(255, 255, 255, 0.45)' }}>Select incident type</span>
+          )}
+        </div>
+        <ChevronDown
+          size={16}
+          style={{
+            color: isOpen ? 'var(--admin-accent-cyan)' : 'rgba(255, 255, 255, 0.45)',
+            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s ease',
+            flexShrink: 0
+          }}
+        />
+      </button>
+
+      {isOpen && (
+        <div
+          role="listbox"
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            left: 0,
+            right: 0,
+            zIndex: 1000,
+            background: '#0b1424',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '10px',
+            boxShadow: '0 16px 36px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(6, 182, 212, 0.15)',
+            backdropFilter: 'blur(16px)',
+            padding: '6px',
+            maxHeight: '320px',
+            overflowY: 'auto'
+          }}
+        >
+          {INCIDENT_TYPES.map((type, idx) => {
+            const isSelected = value === type.value;
+            const isHighlighted = highlightedIndex === idx;
+            const Icon = type.icon;
+            return (
+              <div
+                key={type.value}
+                role="option"
+                aria-selected={isSelected}
+                onClick={() => handleSelect(type)}
+                onMouseEnter={() => setHighlightedIndex(idx)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '9px 12px',
+                  borderRadius: '7px',
+                  cursor: 'pointer',
+                  background: isSelected
+                    ? 'rgba(6, 182, 212, 0.14)'
+                    : isHighlighted
+                    ? 'rgba(255, 255, 255, 0.06)'
+                    : 'transparent',
+                  border: isSelected ? '1px solid rgba(6, 182, 212, 0.25)' : '1px solid transparent',
+                  transition: 'background 0.15s ease, border-color 0.15s ease'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Icon size={15} style={{ color: type.color, opacity: isSelected ? 1 : 0.85, flexShrink: 0 }} />
+                  <span
+                    style={{
+                      color: isSelected ? '#ffffff' : (isHighlighted ? '#ffffff' : 'rgba(255, 255, 255, 0.82)'),
+                      fontSize: '13px',
+                      fontWeight: isSelected ? '600' : '500'
+                    }}
+                  >
+                    {type.label}
+                  </span>
+                </div>
+                {isSelected && (
+                  <Check size={14} style={{ color: 'var(--admin-accent-cyan)', flexShrink: 0 }} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ══════════════════════════════════════════
 // DATA MODEL & INITIAL CONFIGS
@@ -126,7 +370,7 @@ export default function App() {
   };
   
   // Public Incident Reporting States
-  const [incidentType, setIncidentType] = useState('Road Accident');
+  const [incidentType, setIncidentType] = useState('');
   const [incidentLocation, setIncidentLocation] = useState('Baker Jn');
   const [incidentCustomLocation, setIncidentCustomLocation] = useState('');
   const [incidentPriority, setIncidentPriority] = useState('Moderate');
@@ -134,6 +378,7 @@ export default function App() {
   const [incidentPhone, setIncidentPhone] = useState('');
   const [isSubmittingIncident, setIsSubmittingIncident] = useState(false);
   const [publicIncidents, setPublicIncidents] = useState([]);
+  const [incidentViewMode, setIncidentViewMode] = useState('cards'); // 'cards' | 'table'
 
   const fetchPublicIncidents = async () => {
     try {
@@ -151,14 +396,183 @@ export default function App() {
     fetchPublicIncidents();
   }, [currentPage]);
 
-  const [feedbackType, setFeedbackType] = useState('issue');
-  const [feedbackDesc, setFeedbackDesc] = useState('');
-  const [feedbackLocation, setFeedbackLocation] = useState('');
-  const [publicAlerts, setPublicAlerts] = useState([
-    { id: 1, type: 'critical', text: 'Main St & 1st Ave closed for bridge repair. Use Expressway bypass.', time: '10 mins ago' },
-    { id: 2, type: 'warning', text: 'Heavy congestion build-up near Airport Rd & Ring Rd.', time: '25 mins ago' },
-    { id: 3, type: 'info', text: 'Scheduled signal maintenance on Harbor Blvd tonight at 11 PM.', time: '1 hr ago' }
-  ]);
+  // Real-time Kottayam, Kerala Weather & Transit State
+  const [kottayamWeather, setKottayamWeather] = useState(null);
+  const [weatherLoading, setWeatherLoading] = useState(true);
+
+  const fetchKottayamWeather = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/weather/kottayam');
+      if (res.ok) {
+        const data = await res.json();
+        setKottayamWeather(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch Kottayam weather:', err);
+    } finally {
+      setWeatherLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchKottayamWeather();
+    const interval = setInterval(fetchKottayamWeather, 300000); // 5 min sync
+    return () => clearInterval(interval);
+  }, []);
+
+  // ─── Public Notifications State & Handlers ───
+  const [publicNotifications, setPublicNotifications] = useState([]);
+  const [publicNotificationFilter, setPublicNotificationFilter] = useState('all');
+  const [readNotificationIds, setReadNotificationIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`urbanflow_read_notifs_${currentUser?.email || 'guest'}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const fetchPublicNotifications = async () => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/public/notifications?user_name=${encodeURIComponent(currentUser?.name || '')}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPublicNotifications(data.notifications || []);
+      }
+    } catch (err) {
+      console.error('Failed to load public notifications:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchPublicNotifications();
+    const interval = setInterval(fetchPublicNotifications, 20000); // 20s live sync
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
+  const markNotificationAsRead = (id) => {
+    setReadNotificationIds(prev => {
+      if (prev.includes(id)) return prev;
+      const updated = [...prev, id];
+      try {
+        localStorage.setItem(`urbanflow_read_notifs_${currentUser?.email || 'guest'}`, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  const markAllNotificationsAsRead = () => {
+    const allIds = publicNotifications.map(n => n.id);
+    setReadNotificationIds(allIds);
+    try {
+      localStorage.setItem(`urbanflow_read_notifs_${currentUser?.email || 'guest'}`, JSON.stringify(allIds));
+    } catch {}
+    addToast('All notifications marked as read.', 'info');
+  };
+
+  const unreadNotificationCount = publicNotifications.filter(n => !readNotificationIds.includes(n.id)).length;
+
+  // ─── Public Profile State & Handlers ───
+  const [profileName, setProfileName] = useState(currentUser?.name || '');
+  const [profilePhone, setProfilePhone] = useState(currentUser?.phone || '');
+  const [profileCity, setProfileCity] = useState(currentUser?.city || 'Kottayam, Kerala');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Sync profile fields when currentUser changes
+  useEffect(() => {
+    if (currentUser) {
+      setProfileName(currentUser.name || '');
+      setProfilePhone(currentUser.phone || '');
+      setProfileCity(currentUser.city || 'Kottayam, Kerala');
+    }
+  }, [currentUser]);
+
+  const handleProfileSave = async (e) => {
+    e.preventDefault();
+    if (!profileName.trim()) {
+      addToast('Name cannot be empty.', 'error');
+      return;
+    }
+    setIsSavingProfile(true);
+    try {
+      const identifier = currentUser?.id ? String(currentUser.id) : (currentUser?.email || '1');
+      const res = await fetch(`http://localhost:8000/api/users/${encodeURIComponent(identifier)}/profile`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: profileName.trim(),
+          phone: profilePhone.trim(),
+          city: profileCity.trim()
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const updated = {
+          ...currentUser,
+          ...data.user
+        };
+        setCurrentUser(updated);
+        localStorage.setItem('currentUser', JSON.stringify(updated));
+        addToast('Profile updated successfully!', 'success');
+      } else {
+        addToast(data.detail || data.message || 'Failed to update profile.', 'error');
+      }
+    } catch (err) {
+      addToast(`Error updating profile: ${err.message}`, 'error');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  // Profile Password Change State
+  const [pwdCurrent, setPwdCurrent] = useState('');
+  const [pwdNew, setPwdNew] = useState('');
+  const [pwdConfirm, setPwdConfirm] = useState('');
+  const [showPwdCurrent, setShowPwdCurrent] = useState(false);
+  const [showPwdNew, setShowPwdNew] = useState(false);
+  const [showPwdConfirm, setShowPwdConfirm] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+
+  const handleProfilePasswordChange = async (e) => {
+    e.preventDefault();
+    if (!pwdCurrent) {
+      addToast('Please enter your current password.', 'error');
+      return;
+    }
+    if (pwdNew.length < 6) {
+      addToast('New password must be at least 6 characters.', 'error');
+      return;
+    }
+    if (pwdNew !== pwdConfirm) {
+      addToast('New passwords do not match.', 'error');
+      return;
+    }
+    setIsUpdatingPassword(true);
+    try {
+      const res = await fetch('http://localhost:8000/api/users/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: currentUser?.email,
+          current_password: pwdCurrent,
+          new_password: pwdNew
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        addToast('Password updated successfully!', 'success');
+        setPwdCurrent('');
+        setPwdNew('');
+        setPwdConfirm('');
+      } else {
+        addToast(data.detail || 'Incorrect current password or update failed.', 'error');
+      }
+    } catch (err) {
+      addToast(`Password update error: ${err.message}`, 'error');
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
 
   const [ruleAdaptive, setRuleAdaptive] = useState(true);
   const [ruleEmergency, setRuleEmergency] = useState(true);
@@ -515,19 +929,12 @@ export default function App() {
     ]);
   };
 
-  const handleFeedbackSubmit = (e) => {
-    e.preventDefault();
-    if (!feedbackDesc) {
-      addToast('Please enter a feedback description.', 'error');
-      return;
-    }
-    addToast('Feedback successfully submitted to City Traffic Command Center.', 'success');
-    setFeedbackDesc('');
-    setFeedbackLocation('');
-  };
-
   const handleIncidentSubmit = async (e) => {
     e.preventDefault();
+    if (!incidentType) {
+      addToast('Please select an incident type.', 'error');
+      return;
+    }
     const finalLocation = incidentLocation === 'Other' ? incidentCustomLocation.trim() : incidentLocation;
     if (!finalLocation) {
       addToast('Please specify the incident location or intersection.', 'error');
@@ -555,7 +962,8 @@ export default function App() {
 
       if (res.ok) {
         const data = await res.json();
-        addToast(`🚨 Incident ${data.id} submitted! Traffic Controllers and Admins have been notified.`, 'success');
+        addToast(`Incident ${data.id} submitted! Traffic Controllers and Admins have been notified.`, 'success');
+        setIncidentType('');
         setIncidentDesc('');
         setIncidentCustomLocation('');
         fetchPublicIncidents();
@@ -1317,7 +1725,7 @@ export default function App() {
 
               <div className="admin-topbar-actions">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--admin-text-muted)', fontSize: '13px', fontFamily: 'var(--font-mono)' }}>
-                  <span>⛅ 24°C Cloudy</span>
+                  <span>{kottayamWeather?.current ? `${kottayamWeather.current.icon} ${kottayamWeather.current.temp}°C • Kottayam, Kerala` : '⛅ 30°C • Kottayam, Kerala'}</span>
                 </div>
 
                 <div style={{ height: '20px', width: '1px', backgroundColor: 'var(--admin-border)' }}></div>
@@ -1448,120 +1856,283 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Right Panel widgets */}
+                    {/* Right Panel: Real-time Weather & Transit for Kottayam, Kerala */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                      <div className="admin-panel">
-                        <div className="admin-panel-header">
-                          <span className="admin-panel-title">
-                            <AlertTriangle size={16} style={{ color: 'var(--danger)' }} /> Public Traffic Alerts
+                      <div className="admin-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                        <div className="admin-panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--admin-border)', paddingBottom: '12px', marginBottom: '16px' }}>
+                          <div>
+                            <span className="admin-panel-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span>⛅</span> Hourly Weather & Transit
+                            </span>
+                            <div style={{ fontSize: '11px', color: 'var(--admin-accent-cyan)', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span>📍</span> Kottayam, Kerala, India • Baker Jn Hub
+                            </div>
+                          </div>
+                          <span style={{ 
+                            fontSize: '10.5px', 
+                            padding: '3px 8px', 
+                            borderRadius: '10px', 
+                            background: 'rgba(16, 185, 129, 0.1)', 
+                            color: '#10b981', 
+                            border: '1px solid rgba(16, 185, 129, 0.25)',
+                            fontWeight: '600'
+                          }}>
+                            Live IMD Feed
                           </span>
                         </div>
-                        <div className="dashboard-alert-list">
-                          {publicAlerts.map(alert => (
-                            <div key={alert.id} className={`dashboard-alert-item ${alert.type === 'critical' ? 'critical' : alert.type === 'warning' ? 'warning' : 'info'}`} style={{ borderColor: alert.type === 'info' ? 'rgba(59, 130, 246, 0.2)' : '', backgroundColor: alert.type === 'info' ? 'rgba(59, 130, 246, 0.05)' : '' }}>
-                              <div className="dashboard-alert-content">
-                                <span style={{ fontWeight: '600', textTransform: 'capitalize' }}>{alert.type} Alert</span>
-                                <span>{alert.text}</span>
-                                <span className="dashboard-alert-time">{alert.time}</span>
+
+                        {/* Real-time Hero Weather Card */}
+                        <div style={{
+                          background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.12), rgba(59, 130, 246, 0.08))',
+                          border: '1px solid rgba(6, 182, 212, 0.25)',
+                          borderRadius: '12px',
+                          padding: '14px 16px',
+                          marginBottom: '16px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '32px' }}>{kottayamWeather?.current?.icon || '⛅'}</span>
+                              <div>
+                                <div style={{ fontSize: '26px', fontWeight: '800', color: 'white', lineHeight: '1.1' }}>
+                                  {kottayamWeather?.current?.temp !== undefined ? `${kottayamWeather.current.temp}°C` : '30.5°C'}
+                                </div>
+                                <div style={{ fontSize: '12px', color: 'var(--admin-accent-cyan)', fontWeight: '600' }}>
+                                  {kottayamWeather?.current?.condition || 'Tropical Cloudy'}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right', fontSize: '11.5px', color: 'var(--admin-text-muted)' }}>
+                            <div>💧 Humidity: <span style={{ color: 'white', fontWeight: '600' }}>{kottayamWeather?.current?.humidity ?? 76}%</span></div>
+                            <div style={{ marginTop: '3px' }}>💨 Wind: <span style={{ color: 'white', fontWeight: '600' }}>{kottayamWeather?.current?.wind ?? 9.2} km/h</span></div>
+                          </div>
+                        </div>
+
+                        {/* Transit Advisory Banner */}
+                        <div style={{ 
+                          background: 'rgba(15, 23, 42, 0.6)', 
+                          border: '1px solid rgba(255, 255, 255, 0.06)', 
+                          borderRadius: '8px', 
+                          padding: '10px 12px', 
+                          fontSize: '11.5px', 
+                          color: 'var(--admin-text-main)', 
+                          marginBottom: '16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}>
+                          <span style={{ fontSize: '14px' }}>🚦</span>
+                          <span>{kottayamWeather?.current?.advisory || 'Standard transit conditions across Baker Jn and MC Road corridor.'}</span>
+                        </div>
+
+                        {/* Hourly Weather Forecast Rows */}
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--admin-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
+                          Upcoming Hourly Forecast & Road Conditions
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                          {(kottayamWeather?.hourly || [
+                            { time: '11:00 AM', temp: 31.0, condition: 'Partly Cloudy', icon: '⛅', transit_status: 'Dry roads • Optimal transit', transit_color: '#10b981' },
+                            { time: '01:00 PM', temp: 32.4, condition: 'Warm & Humid', icon: '🌤️', transit_status: 'Dry roads • Optimal transit', transit_color: '#10b981' },
+                            { time: '03:00 PM', temp: 31.5, condition: 'Passing Showers', icon: '🌦️', transit_status: 'Damp roads • Normal flow', transit_color: '#f59e0b' },
+                            { time: '05:00 PM', temp: 29.8, condition: 'Light Drizzle', icon: '🌦️', transit_status: 'Damp roads • Normal flow', transit_color: '#f59e0b' },
+                            { time: '07:00 PM', temp: 28.2, condition: 'Scattered Rain', icon: '🌧️', transit_status: 'Wet roads • Drive carefully', transit_color: '#ef4444' }
+                          ]).map((h, idx) => (
+                            <div key={idx} style={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              alignItems: 'center', 
+                              padding: '8px 10px', 
+                              background: 'rgba(255, 255, 255, 0.02)', 
+                              border: '1px solid rgba(255, 255, 255, 0.04)', 
+                              borderRadius: '8px', 
+                              fontSize: '12px' 
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: '14px' }}>{h.icon}</span>
+                                <span style={{ fontWeight: '600', color: 'white', minWidth: '60px' }}>{h.time}</span>
+                                <span style={{ color: 'var(--admin-text-muted)', fontSize: '11.5px' }}>{h.condition}</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span style={{ fontWeight: '700', color: 'white' }}>{h.temp}°C</span>
+                                <span style={{ 
+                                  fontSize: '10px', 
+                                  padding: '2px 6px', 
+                                  borderRadius: '6px', 
+                                  background: `${h.transit_color || '#10b981'}15`, 
+                                  color: h.transit_color || '#10b981',
+                                  border: `1px solid ${h.transit_color || '#10b981'}30`,
+                                  fontWeight: '600'
+                                }}>
+                                  {h.transit_status}
+                                </span>
                               </div>
                             </div>
                           ))}
                         </div>
-                      </div>
 
-                      {/* Weather Forecast Info Card */}
-                      <div className="admin-panel">
-                        <div className="admin-panel-header">
-                          <span className="admin-panel-title">
-                            ⛅ Hourly Weather & Transit
-                          </span>
+                        {/* Kottayam Transit Hub Corridors */}
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--admin-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
+                          Kottayam Key Transit Corridors
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--admin-border)', fontSize: '13px' }}>
-                          <span>08:00 PM - Cloudy</span>
-                          <span style={{ fontWeight: '700' }}>24°C</span>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          {[
+                            { name: 'MC Road (SH 1)', desc: 'Baker Jn Center', status: 'Normal Flow', color: '#10b981' },
+                            { name: 'KK Road (NH 183)', desc: 'Kanjikuzhy Jn', status: 'Moderate (+2m)', color: '#f59e0b' },
+                            { name: 'Nagampadam Stand', desc: 'Overbridge Hub', status: 'Regular', color: '#06b6d4' },
+                            { name: 'KSRTC Central', desc: 'TB Road Terminal', status: 'On Schedule', color: '#10b981' }
+                          ].map((corridor, idx) => (
+                            <div key={idx} style={{ 
+                              background: 'rgba(15, 23, 42, 0.4)', 
+                              border: '1px solid rgba(255, 255, 255, 0.05)', 
+                              borderRadius: '8px', 
+                              padding: '8px 10px' 
+                            }}>
+                              <div style={{ fontSize: '11px', fontWeight: '700', color: 'white' }}>{corridor.name}</div>
+                              <div style={{ fontSize: '10px', color: 'var(--admin-text-muted)' }}>{corridor.desc}</div>
+                              <div style={{ fontSize: '10px', color: corridor.color, fontWeight: '600', marginTop: '2px' }}>● {corridor.status}</div>
+                            </div>
+                          ))}
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--admin-border)', fontSize: '13px' }}>
-                          <span>10:00 PM - Light Rain 🌧️</span>
-                          <span style={{ fontWeight: '700' }}>22°C</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', fontSize: '13px' }}>
-                          <span>12:00 AM - Clear Sky</span>
-                          <span style={{ fontWeight: '700' }}>21°C</span>
-                        </div>
-                      </div>
-
-                      {/* Emergency Notifications */}
-                      <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '14px', borderRadius: '12px', fontSize: '13px' }}>
-                        <div style={{ fontWeight: '700', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                          ⚠️ Emergency Notice
-                        </div>
-                        High winds warning issued for Harbor district until midnight. Heavy vehicles drive with extreme caution.
                       </div>
                     </div>
                   </div>
 
-                  {/* Lower Section */}
-                  <div className="admin-middle-grid" style={{ marginBottom: '20px' }}>
-                    <div className="admin-panel">
-                      <div className="admin-panel-header">
-                        <span className="admin-panel-title">
-                          🗺️ Route Planners & Alternate Options
+                  {/* Hourly Peak Traffic Load (Project Data: Baker Jn Corridor) */}
+                  <div className="admin-panel" style={{ marginBottom: '20px' }}>
+                    <div className="admin-panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', borderBottom: '1px solid var(--admin-border)', paddingBottom: '12px', marginBottom: '16px' }}>
+                      <div>
+                        <span className="admin-panel-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          📈 Hourly Peak Traffic Load — Baker Jn Corridor
                         </span>
+                        <div style={{ fontSize: '11.5px', color: 'var(--admin-text-muted)', marginTop: '2px' }}>
+                          Calibrated with UrbanFlow Digital Twin multi-flow simulation & live TraCI telemetry (Kottayam)
+                        </div>
                       </div>
-                      <div className="admin-table-container">
-                        <table className="admin-table">
-                          <thead>
-                            <tr>
-                              <th>Origin / Destination</th>
-                              <th>Default Path</th>
-                              <th>Suggested Alternate Route</th>
-                              <th>Estimated Time Savings</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr>
-                              <td style={{ fontWeight: '600' }}>North Gate to Airport</td>
-                              <td>Ring Rd Highway</td>
-                              <td style={{ color: 'var(--admin-accent-cyan)' }}>West Bypass Link Road</td>
-                              <td style={{ color: 'var(--admin-accent-green)', fontWeight: '700' }}>- 12 Mins</td>
-                            </tr>
-                            <tr>
-                              <td style={{ fontWeight: '600' }}>Downtown to Harbor District</td>
-                              <td>Main Street</td>
-                              <td style={{ color: 'var(--admin-accent-cyan)' }}>5th Ave Viaduct</td>
-                              <td style={{ color: 'var(--admin-accent-green)', fontWeight: '700' }}>- 4 Mins</td>
-                            </tr>
-                            <tr>
-                              <td style={{ fontWeight: '600' }}>Suburban Hub to Westside</td>
-                              <td>Central Expressway</td>
-                              <td style={{ color: 'var(--admin-accent-cyan)' }}>Metro Ring Loop Line</td>
-                              <td style={{ color: 'var(--admin-accent-green)', fontWeight: '700' }}>- 9 Mins</td>
-                            </tr>
-                          </tbody>
-                        </table>
+                      {/* Live Sim Telemetry Badges */}
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '11px', background: 'rgba(6, 182, 212, 0.1)', color: '#06b6d4', border: '1px solid rgba(6, 182, 212, 0.25)', padding: '3px 9px', borderRadius: '12px', fontWeight: '600' }}>
+                          🚗 {publicMetrics.vehicleCount} Active Vehicles
+                        </span>
+                        <span style={{ fontSize: '11px', background: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '3px 9px', borderRadius: '12px', fontWeight: '600' }}>
+                          ⏱️ {Math.round(publicMetrics.avgWait)}s Avg Wait
+                        </span>
+                        <span style={{ fontSize: '11px', background: 'rgba(139, 92, 246, 0.1)', color: '#c084fc', border: '1px solid rgba(139, 92, 246, 0.25)', padding: '3px 9px', borderRadius: '12px', fontWeight: '600' }}>
+                          ⚡ -28.9% Delay Reduction
+                        </span>
                       </div>
                     </div>
 
-                    <div className="admin-panel">
-                      <div className="admin-panel-header">
-                        <span className="admin-panel-title">
-                          📈 Hourly Peak Traffic Load
-                        </span>
-                      </div>
-                      {/* CSS 2D Load chart */}
-                      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '100px', padding: '10px 0 0 0' }}>
-                        {[
-                          { hour: '8 AM', height: '80%' },
-                          { hour: '12 PM', height: '40%' },
-                          { hour: '4 PM', height: '60%' },
-                          { hour: '6 PM', height: '95%' },
-                          { hour: '8 PM', height: '50%' }
-                        ].map((bar, idx) => (
-                          <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '15%', gap: '8px' }}>
-                            <div style={{ height: bar.height, width: '100%', background: 'linear-gradient(to top, var(--admin-accent-cyan), var(--admin-accent-blue))', borderRadius: '4px 4px 0 0' }}></div>
-                            <span style={{ fontSize: '10px', color: 'var(--admin-text-muted)' }}>{bar.hour}</span>
+                    {/* Interactive 8-Period Hourly Traffic Load Chart */}
+                    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '140px', padding: '16px 8px 4px', gap: '10px' }}>
+                      {[
+                        { hour: '06 AM', label: '06:00 - 08:00 AM', name: 'Early Commute', load: 32, veh: 48, wait: '8s', peak: false },
+                        { hour: '08 AM', label: '08:00 - 10:00 AM', name: 'Morning Rush', load: 88, veh: 138, wait: '34s', peak: true },
+                        { hour: '10 AM', label: '10:00 - 12:00 PM', name: 'Midday Transit', load: 54, veh: 82, wait: '16s', peak: false, isCurrent: true },
+                        { hour: '12 PM', label: '12:00 - 02:00 PM', name: 'Intercity Flow', load: 49, veh: 74, wait: '14s', peak: false },
+                        { hour: '02 PM', label: '02:00 - 04:00 PM', name: 'School/Autos', load: 64, veh: 96, wait: '22s', peak: false },
+                        { hour: '04 PM', label: '04:00 - 06:00 PM', name: 'Evening Rush', load: 84, veh: 128, wait: '31s', peak: true },
+                        { hour: '06 PM', label: '06:00 - 08:00 PM', name: 'Core Evening Peak', load: 98, veh: 156, wait: '39s', peak: true, max: true },
+                        { hour: '08 PM', label: '08:00 - 10:00 PM', name: 'Night Transit', load: 41, veh: 62, wait: '11s', peak: false }
+                      ].map((bar, idx) => {
+                        const barColor = bar.max 
+                          ? 'linear-gradient(to top, #ef4444, #f97316)' 
+                          : (bar.peak 
+                              ? 'linear-gradient(to top, #f59e0b, #eab308)' 
+                              : (bar.isCurrent 
+                                  ? 'linear-gradient(to top, var(--admin-accent-cyan), #38bdf8)' 
+                                  : 'linear-gradient(to top, rgba(6, 182, 212, 0.4), rgba(59, 130, 246, 0.6))'));
+                        return (
+                          <div key={idx} style={{ 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            alignItems: 'center', 
+                            flex: 1, 
+                            height: '100%', 
+                            justifyContent: 'flex-end',
+                            position: 'relative'
+                          }}>
+                            {/* Value badge */}
+                            <span style={{ 
+                              fontSize: '9.5px', 
+                              fontWeight: '700', 
+                              color: bar.max ? '#ef4444' : (bar.peak ? '#f59e0b' : (bar.isCurrent ? '#38bdf8' : 'var(--admin-text-muted)')), 
+                              marginBottom: '4px' 
+                            }}>
+                              {bar.isCurrent ? `${publicMetrics.vehicleCount} Sim` : `${bar.load}%`}
+                            </span>
+
+                            {/* Bar container */}
+                            <div style={{
+                              width: '100%',
+                              maxWidth: '36px',
+                              height: `${bar.isCurrent ? Math.min(100, Math.max(25, publicMetrics.vehicleCount * 3)) : bar.load}%`,
+                              background: barColor,
+                              borderRadius: '5px 5px 0 0',
+                              border: bar.isCurrent ? '1.5px solid #38bdf8' : 'none',
+                              boxShadow: bar.isCurrent ? '0 0 12px rgba(56, 189, 248, 0.4)' : (bar.max ? '0 0 10px rgba(239, 68, 68, 0.3)' : 'none'),
+                              transition: 'height 0.4s ease',
+                              position: 'relative'
+                            }}>
+                              {bar.isCurrent && (
+                                <div style={{
+                                  position: 'absolute',
+                                  top: '-18px',
+                                  left: '50%',
+                                  transform: 'translateX(-50%)',
+                                  background: '#0284c7',
+                                  color: 'white',
+                                  fontSize: '8px',
+                                  fontWeight: '800',
+                                  padding: '1px 4px',
+                                  borderRadius: '4px',
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  LIVE
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Hour label */}
+                            <span style={{ fontSize: '10.5px', fontWeight: bar.isCurrent ? '700' : '600', color: bar.isCurrent ? '#38bdf8' : 'white', marginTop: '6px' }}>
+                              {bar.hour}
+                            </span>
+                            <span style={{ fontSize: '9px', color: 'var(--admin-text-muted)', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+                              {bar.name.split(' ')[0]}
+                            </span>
                           </div>
-                        ))}
+                        );
+                      })}
+                    </div>
+
+                    {/* Project Data Split Footer */}
+                    <div style={{
+                      marginTop: '16px',
+                      paddingTop: '12px',
+                      borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '12px',
+                      fontSize: '11.5px'
+                    }}>
+                      <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                        <span style={{ color: 'var(--admin-text-muted)' }}>Baker Jn Directional Flow:</span>
+                        <span style={{ color: '#06b6d4', fontWeight: '600' }}>North MC Rd (32%)</span>
+                        <span style={{ color: '#3b82f6', fontWeight: '600' }}>South MC Rd (28%)</span>
+                        <span style={{ color: '#8b5cf6', fontWeight: '600' }}>East KK Rd (23%)</span>
+                        <span style={{ color: '#10b981', fontWeight: '600' }}>West TB Rd (17%)</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#ef4444', fontWeight: '600' }}>
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444' }}></span> Max Peak: 06-08 PM (156 veh/h)
+                        </span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#f59e0b', fontWeight: '600' }}>
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b' }}></span> Morning Rush: 08-10 AM (138 veh/h)
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1575,68 +2146,14 @@ export default function App() {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                       <div style={{ paddingBottom: '10px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                        <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--admin-text-main)' }}>Upcoming Smart Signal Installation Work</div>
-                        <div style={{ fontSize: '12px', color: 'var(--admin-text-muted)', marginTop: '4px' }}>The Traffic Management Bureau will be installing smart adaptive signal cameras at the Harbor Blvd & 5th intersection. Expect temporary lane shifts from July 30th to August 2nd.</div>
+                        <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--admin-text-main)' }}>Upcoming Smart Signal Calibration Work</div>
+                        <div style={{ fontSize: '12px', color: 'var(--admin-text-muted)', marginTop: '4px' }}>The Traffic Management Bureau is calibrating smart adaptive signal sensors along the Baker Junction & MC Road corridor. Real-time telemetry is actively synced to the Digital Twin.</div>
                       </div>
                       <div>
-                        <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--admin-text-main)' }}>Digital Twin System Beta Launching</div>
-                        <div style={{ fontSize: '12px', color: 'var(--admin-text-muted)', marginTop: '4px' }}>UrbanFlow Digital Twin platform version 1.2 is now accessible to the public, allowing users to plan city routes using real-time predictive simulation data.</div>
+                        <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--admin-text-main)' }}>Digital Twin System Live in Kottayam</div>
+                        <div style={{ fontSize: '12px', color: 'var(--admin-text-muted)', marginTop: '4px' }}>UrbanFlow Digital Twin platform is actively monitoring Baker Junction, providing live queue mitigation, adaptive signal control, and real-time weather & transit telemetry.</div>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Bottom section: Feedback Panel */}
-                  <div className="admin-panel" id="public-feedback-panel">
-                    <div className="admin-panel-header">
-                      <span className="admin-panel-title">
-                        📨 Submit Public Report & Signal Feedback
-                      </span>
-                    </div>
-                    <form onSubmit={handleFeedbackSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '16px', alignItems: 'flex-end' }}>
-                      <div className="form-group">
-                        <label className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px' }}>Report Type</label>
-                        <select 
-                          className="form-control" 
-                          style={{ background: '#09111e', border: '1px solid var(--admin-border)', color: 'white', fontSize: '13px' }}
-                          value={feedbackType}
-                          onChange={(e) => setFeedbackType(e.target.value)}
-                        >
-                          <option value="issue">Report Traffic Issue</option>
-                          <option value="signal">Report Damaged Signal</option>
-                          <option value="accident">Report Road Accident</option>
-                          <option value="suggestion">Submit Transit Suggestion</option>
-                        </select>
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px' }}>Description & Details</label>
-                        <input 
-                          type="text" 
-                          className="form-control" 
-                          placeholder="e.g. Traffic light timer broken, lane divider knocked over..."
-                          style={{ background: '#09111e', border: '1px solid var(--admin-border)', color: 'white', fontSize: '13px' }}
-                          value={feedbackDesc}
-                          onChange={(e) => setFeedbackDesc(e.target.value)}
-                          required
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px' }}>Junction / Location</label>
-                        <input 
-                          type="text" 
-                          className="form-control" 
-                          placeholder="e.g. Airport Rd & Ring Rd"
-                          style={{ background: '#09111e', border: '1px solid var(--admin-border)', color: 'white', fontSize: '13px' }}
-                          value={feedbackLocation}
-                          onChange={(e) => setFeedbackLocation(e.target.value)}
-                        />
-                      </div>
-
-                      <button type="submit" className="btn btn-primary" style={{ height: '42px', justifySelf: 'stretch', justifyContent: 'center' }}>
-                        Submit Report
-                      </button>
-                    </form>
                   </div>
                 </>
               )}
@@ -1647,7 +2164,7 @@ export default function App() {
                   <div className="admin-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                       <h1 style={{ fontSize: '24px', fontWeight: '800', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ color: '#ef4444' }}>🚨</span> Report Traffic Incident
+                        <AlertTriangle size={24} style={{ color: '#ef4444' }} /> Report Traffic Incident
                       </h1>
                       <div className="admin-subtitle">
                         Submit road disruptions, accidents, and hazards. Directly notified to City Traffic Controllers and Admins in real time.
@@ -1685,24 +2202,13 @@ export default function App() {
                         {/* Incident Type & Location */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                           <div className="form-group">
-                            <label className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px', fontWeight: '600' }}>
+                            <label id="incident-type-label" className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px', fontWeight: '600' }}>
                               Incident Type *
                             </label>
-                            <select
-                              className="form-control"
-                              style={{ background: '#09111e', border: '1px solid var(--admin-border)', color: 'white', fontSize: '13px' }}
+                            <IncidentTypeSelect
                               value={incidentType}
-                              onChange={(e) => setIncidentType(e.target.value)}
-                            >
-                              <option value="Road Accident">💥 Road Accident / Collision</option>
-                              <option value="Severe Congestion">🚗 Severe Congestion / Gridlock</option>
-                              <option value="Damaged Signal">🚦 Damaged / Broken Signal</option>
-                              <option value="Road Hazard">⚠️ Road Hazard / Obstruction</option>
-                              <option value="Waterlogging">🌊 Waterlogging / Flooding</option>
-                              <option value="Vehicle Breakdown">🛑 Stalled / Breakdown Vehicle</option>
-                              <option value="Illegal Parking">🚫 Illegal Parking / Lane Block</option>
-                              <option value="Other Disruption">📝 Other Transit Issue</option>
-                            </select>
+                              onChange={(val) => setIncidentType(val)}
+                            />
                           </div>
 
                           <div className="form-group">
@@ -1751,8 +2257,8 @@ export default function App() {
                           </label>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
                             {[
-                              { level: 'Critical', desc: 'Blocked Lane / Emergency', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' },
-                              { level: 'High', desc: 'Severe Delay / Risk', color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)' },
+                              { level: 'Critical', desc: 'Emergency / Immediate Threat', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' },
+                              { level: 'Heavy', desc: 'Severe Hazard / Disruption', color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)' },
                               { level: 'Moderate', desc: 'Moderate Flow Issue', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
                               { level: 'Low', desc: 'Minor Advisory', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.15)' },
                             ].map(p => (
@@ -1781,12 +2287,12 @@ export default function App() {
                         {/* Situation Description */}
                         <div className="form-group">
                           <label className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px', fontWeight: '600' }}>
-                            Situation Details & Landmark Description *
+                            Situation Details & Observation Description *
                           </label>
                           <textarea
                             className="form-control"
                             rows={3}
-                            placeholder="Detail what is happening (e.g. damaged signal light flashing red, two vehicles collided on left lane, traffic backed up 200m)..."
+                            placeholder="Detail what was observed (e.g. vehicle was driving at very high speed near the junction, or vehicle was repeatedly changing lanes aggressively and driving dangerously)..."
                             style={{ background: '#09111e', border: '1px solid var(--admin-border)', color: 'white', fontSize: '13px', resize: 'vertical' }}
                             value={incidentDesc}
                             onChange={(e) => setIncidentDesc(e.target.value)}
@@ -1896,28 +2402,189 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Bottom: Live Incident Status Tracker */}
+                  {/* Bottom: Live Incident Status Tracker & Community Feed */}
                   <div className="admin-panel" style={{ padding: '24px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                       <div>
                         <h2 style={{ fontSize: '16px', fontWeight: '700', color: 'white', margin: 0 }}>City Incident Feed & Verification Status</h2>
                         <p style={{ fontSize: '12px', color: 'var(--admin-text-muted)', margin: '4px 0 0' }}>Live status of community-reported disruptions and response actions taken by traffic controllers.</p>
                       </div>
-                      <button
-                        onClick={fetchPublicIncidents}
-                        className="btn btn-ghost btn-sm"
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', borderColor: 'var(--admin-border)' }}
-                      >
-                        <RefreshCw size={13} />
-                        Refresh Feed
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.05)', padding: '3px', borderRadius: '8px', border: '1px solid var(--admin-border)' }}>
+                          <button
+                            type="button"
+                            onClick={() => setIncidentViewMode('cards')}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              background: incidentViewMode === 'cards' ? 'var(--admin-accent-cyan)' : 'transparent',
+                              color: incidentViewMode === 'cards' ? '#000000' : 'rgba(255,255,255,0.6)',
+                              fontWeight: '600',
+                              fontSize: '11px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <Grid size={12} /> Cards
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIncidentViewMode('table')}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              background: incidentViewMode === 'table' ? 'var(--admin-accent-cyan)' : 'transparent',
+                              color: incidentViewMode === 'table' ? '#000000' : 'rgba(255,255,255,0.6)',
+                              fontWeight: '600',
+                              fontSize: '11px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <List size={12} /> Table
+                          </button>
+                        </div>
+                        <button
+                          onClick={fetchPublicIncidents}
+                          className="btn btn-ghost btn-sm"
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', borderColor: 'var(--admin-border)' }}
+                        >
+                          <RefreshCw size={13} />
+                          Refresh Feed
+                        </button>
+                      </div>
                     </div>
 
                     {publicIncidents.length === 0 ? (
                       <div style={{ textAlign: 'center', padding: '36px', color: 'var(--admin-text-muted)', fontSize: '13px' }}>
                         No incidents reported yet. All corridors clear.
                       </div>
+                    ) : incidentViewMode === 'cards' ? (
+                      /* Community Incident Cards Grid */
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+                        {publicIncidents.map(inc => {
+                          const meta = getIncidentTypeMeta(inc.type);
+                          const IconComponent = meta.icon;
+                          const isCritical = inc.priority === 'Critical';
+                          const isHeavy = inc.priority === 'Heavy' || inc.priority === 'High';
+                          return (
+                            <div
+                              key={inc.id}
+                              style={{
+                                background: 'rgba(15, 23, 42, 0.65)',
+                                border: '1px solid rgba(255, 255, 255, 0.07)',
+                                borderRadius: '12px',
+                                padding: '16px 18px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '12px',
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <IconComponent size={16} style={{ color: meta.color }} />
+                                  <span style={{ fontSize: '13px', fontWeight: '800', letterSpacing: '0.04em', color: 'white' }}>
+                                    {inc.type.toUpperCase()}
+                                  </span>
+                                </div>
+                                <span style={{
+                                  fontSize: '11px',
+                                  fontFamily: 'monospace',
+                                  color: 'var(--admin-accent-cyan)',
+                                  background: 'rgba(6, 182, 212, 0.1)',
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  border: '1px solid rgba(6, 182, 212, 0.25)',
+                                  fontWeight: '600'
+                                }}>
+                                  {inc.id}
+                                </span>
+                              </div>
+
+                              <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(3, 1fr)',
+                                gap: '8px',
+                                background: 'rgba(255, 255, 255, 0.02)',
+                                padding: '10px 12px',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(255, 255, 255, 0.04)',
+                                fontSize: '12px'
+                              }}>
+                                <div>
+                                  <div style={{ color: 'var(--admin-text-muted)', fontSize: '10.5px', textTransform: 'uppercase', fontWeight: '600' }}>Intersection</div>
+                                  <div style={{ fontWeight: '600', color: 'rgba(255, 255, 255, 0.9)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {inc.location}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div style={{ color: 'var(--admin-text-muted)', fontSize: '10.5px', textTransform: 'uppercase', fontWeight: '600' }}>Urgency</div>
+                                  <div style={{ marginTop: '2px' }}>
+                                    <span style={{
+                                      padding: '2px 7px',
+                                      borderRadius: '6px',
+                                      fontSize: '11px',
+                                      fontWeight: '700',
+                                      background: isCritical ? 'rgba(239, 68, 68, 0.15)' : isHeavy ? 'rgba(249, 115, 22, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                      color: isCritical ? '#ef4444' : isHeavy ? '#f97316' : '#f59e0b',
+                                      border: `1px solid ${isCritical ? 'rgba(239, 68, 68, 0.3)' : 'rgba(249, 115, 22, 0.3)'}`
+                                    }}>
+                                      {inc.priority}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div>
+                                  <div style={{ color: 'var(--admin-text-muted)', fontSize: '10.5px', textTransform: 'uppercase', fontWeight: '600' }}>Status</div>
+                                  <div style={{ marginTop: '2px' }}>
+                                    <span style={{
+                                      padding: '2px 8px',
+                                      borderRadius: '10px',
+                                      fontSize: '11px',
+                                      fontWeight: '700',
+                                      background: inc.status === 'Resolved' ? 'rgba(16, 185, 129, 0.15)' : (inc.status === 'Verifying' || inc.status === 'Verified') ? 'rgba(59, 130, 246, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                      color: inc.status === 'Resolved' ? '#10b981' : (inc.status === 'Verifying' || inc.status === 'Verified') ? '#3b82f6' : '#f59e0b',
+                                      border: `1px solid ${inc.status === 'Resolved' ? '#10b981' : (inc.status === 'Verifying' || inc.status === 'Verified') ? '#3b82f6' : '#f59e0b'}`
+                                    }}>
+                                      ● {inc.status}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {inc.description && (
+                                <div style={{ fontSize: '12.5px', color: 'rgba(255, 255, 255, 0.72)', lineHeight: '1.4' }}>
+                                  "{inc.description}"
+                                </div>
+                              )}
+
+                              <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                fontSize: '11px',
+                                color: 'rgba(255, 255, 255, 0.45)',
+                                borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+                                paddingTop: '8px'
+                              }}>
+                                <span>Reported by: <strong style={{ color: 'rgba(255, 255, 255, 0.7)' }}>{inc.reportedBy}</strong></span>
+                                <span>{inc.time}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     ) : (
+                      /* Table View */
                       <div style={{ overflowX: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
                           <thead>
@@ -1932,41 +2599,52 @@ export default function App() {
                             </tr>
                           </thead>
                           <tbody>
-                            {publicIncidents.map(inc => (
-                              <tr key={inc.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                                <td style={{ padding: '12px 14px', fontFamily: 'monospace', color: '#06b6d4', fontWeight: '700' }}>{inc.id}</td>
-                                <td style={{ padding: '12px 14px', fontWeight: '600' }}>{inc.type}</td>
-                                <td style={{ padding: '12px 14px', color: 'rgba(255,255,255,0.85)' }}>{inc.location}</td>
-                                <td style={{ padding: '12px 14px' }}>
-                                  <span style={{
-                                    padding: '2px 8px',
-                                    borderRadius: '10px',
-                                    fontSize: '11px',
-                                    fontWeight: '700',
-                                    background: inc.priority === 'Critical' ? 'rgba(239, 68, 68, 0.15)' : inc.priority === 'High' ? 'rgba(249, 115, 22, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                                    color: inc.priority === 'Critical' ? '#ef4444' : inc.priority === 'High' ? '#f97316' : '#f59e0b',
-                                    border: `1px solid ${inc.priority === 'Critical' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`
-                                  }}>
-                                    {inc.priority}
-                                  </span>
-                                </td>
-                                <td style={{ padding: '12px 14px', color: 'rgba(255,255,255,0.6)' }}>{inc.reportedBy}</td>
-                                <td style={{ padding: '12px 14px', color: 'rgba(255,255,255,0.4)', fontSize: '11.5px' }}>{inc.time}</td>
-                                <td style={{ padding: '12px 14px' }}>
-                                  <span style={{
-                                    padding: '3px 10px',
-                                    borderRadius: '12px',
-                                    fontSize: '11.5px',
-                                    fontWeight: '700',
-                                    background: inc.status === 'Resolved' ? 'rgba(16, 185, 129, 0.15)' : inc.status === 'Verified' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                                    color: inc.status === 'Resolved' ? '#10b981' : inc.status === 'Verified' ? '#3b82f6' : '#f59e0b',
-                                    border: `1px solid ${inc.status === 'Resolved' ? '#10b981' : inc.status === 'Verified' ? '#3b82f6' : '#f59e0b'}`
-                                  }}>
-                                    ● {inc.status}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
+                            {publicIncidents.map(inc => {
+                              const meta = getIncidentTypeMeta(inc.type);
+                              const IconComponent = meta.icon;
+                              const isCritical = inc.priority === 'Critical';
+                              const isHeavy = inc.priority === 'Heavy' || inc.priority === 'High';
+                              return (
+                                <tr key={inc.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                  <td style={{ padding: '12px 14px', fontFamily: 'monospace', color: '#06b6d4', fontWeight: '700' }}>{inc.id}</td>
+                                  <td style={{ padding: '12px 14px', fontWeight: '600' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <IconComponent size={14} style={{ color: meta.color }} />
+                                      <span>{inc.type}</span>
+                                    </div>
+                                  </td>
+                                  <td style={{ padding: '12px 14px', color: 'rgba(255,255,255,0.85)' }}>{inc.location}</td>
+                                  <td style={{ padding: '12px 14px' }}>
+                                    <span style={{
+                                      padding: '2px 8px',
+                                      borderRadius: '10px',
+                                      fontSize: '11px',
+                                      fontWeight: '700',
+                                      background: isCritical ? 'rgba(239, 68, 68, 0.15)' : isHeavy ? 'rgba(249, 115, 22, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                      color: isCritical ? '#ef4444' : isHeavy ? '#f97316' : '#f59e0b',
+                                      border: `1px solid ${isCritical ? 'rgba(239, 68, 68, 0.3)' : 'rgba(249, 115, 22, 0.3)'}`
+                                    }}>
+                                      {inc.priority}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '12px 14px', color: 'rgba(255,255,255,0.6)' }}>{inc.reportedBy}</td>
+                                  <td style={{ padding: '12px 14px', color: 'rgba(255,255,255,0.4)', fontSize: '11.5px' }}>{inc.time}</td>
+                                  <td style={{ padding: '12px 14px' }}>
+                                    <span style={{
+                                      padding: '3px 10px',
+                                      borderRadius: '12px',
+                                      fontSize: '11.5px',
+                                      fontWeight: '700',
+                                      background: inc.status === 'Resolved' ? 'rgba(16, 185, 129, 0.15)' : (inc.status === 'Verifying' || inc.status === 'Verified') ? 'rgba(59, 130, 246, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                      color: inc.status === 'Resolved' ? '#10b981' : (inc.status === 'Verifying' || inc.status === 'Verified') ? '#3b82f6' : '#f59e0b',
+                                      border: `1px solid ${inc.status === 'Resolved' ? '#10b981' : (inc.status === 'Verifying' || inc.status === 'Verified') ? '#3b82f6' : '#f59e0b'}`
+                                    }}>
+                                      ● {inc.status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -1975,18 +2653,881 @@ export default function App() {
                 </div>
               )}
 
-              {['notifications', 'profile'].includes(publicActiveTab) && (
-                <div style={{ padding: '60px', textAlign: 'center' }} className="admin-panel page-enter">
-                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>🗺️</div>
-                  <h2 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--admin-text-main)' }}>
-                    {publicActiveTab.charAt(0).toUpperCase() + publicActiveTab.slice(1).replace('_', ' ')}
-                  </h2>
-                  <p style={{ color: 'var(--admin-text-muted)', fontSize: '14px', marginTop: '8px', maxWidth: '380px', margin: '8px auto' }}>
-                    This public information service module is updated live by the Smart Traffic Bureau. Use alternative options inside the main dashboard panel to configure routes.
-                  </p>
-                  <button className="btn btn-ghost btn-sm" style={{ marginTop: '16px', borderColor: 'var(--admin-border)' }} onClick={() => setPublicActiveTab('dashboard')}>
-                    Return to Hub Home
-                  </button>
+              {publicActiveTab === 'notifications' && (
+                <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+                  {/* Title & Actions Bar */}
+                  <div className="admin-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+                    <div>
+                      <h1 style={{ fontSize: '24px', fontWeight: '800', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Bell size={24} style={{ color: 'var(--admin-accent-cyan)' }} /> Public Traffic Advisories & Notifications
+                      </h1>
+                      <div className="admin-subtitle">
+                        Live corridor alerts, verified citizen incident updates, transit optimizations, and official bulletins for Kottayam.
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <span style={{
+                        fontSize: '12px',
+                        color: unreadNotificationCount > 0 ? '#38bdf8' : 'var(--admin-text-muted)',
+                        background: unreadNotificationCount > 0 ? 'rgba(6, 182, 212, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+                        border: unreadNotificationCount > 0 ? '1px solid rgba(6, 182, 212, 0.3)' : '1px solid var(--admin-border)',
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '7px'
+                      }}>
+                        {unreadNotificationCount > 0 && (
+                          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#38bdf8', boxShadow: '0 0 8px #38bdf8' }}></span>
+                        )}
+                        {unreadNotificationCount > 0 ? `${unreadNotificationCount} Unread Advisories` : 'All Advisories Read'}
+                      </span>
+                      {unreadNotificationCount > 0 && (
+                        <button
+                          onClick={markAllNotificationsAsRead}
+                          className="btn btn-ghost btn-sm"
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', borderColor: 'rgba(255, 255, 255, 0.15)' }}
+                        >
+                          <CheckCheck size={14} /> Mark All as Read
+                        </button>
+                      )}
+                      <button
+                        onClick={fetchPublicNotifications}
+                        className="btn btn-ghost btn-sm"
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', borderColor: 'rgba(255, 255, 255, 0.15)' }}
+                        title="Check for new notifications"
+                      >
+                        <RefreshCw size={13} /> Refresh
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Filter Chips Bar */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    {[
+                      { id: 'all', label: 'All Advisories', count: publicNotifications.length },
+                      { id: 'incident', label: 'Incident Updates', count: publicNotifications.filter(n => n.category === 'incident').length },
+                      { id: 'transit', label: 'Signal & Corridors', count: publicNotifications.filter(n => n.category === 'transit').length },
+                      { id: 'weather', label: 'Weather & Roads', count: publicNotifications.filter(n => n.category === 'weather').length },
+                      { id: 'announcement', label: 'System Bulletins', count: publicNotifications.filter(n => n.category === 'announcement').length },
+                    ].map(f => {
+                      const isActive = publicNotificationFilter === f.id;
+                      return (
+                        <button
+                          key={f.id}
+                          onClick={() => setPublicNotificationFilter(f.id)}
+                          style={{
+                            padding: '7px 14px',
+                            borderRadius: '8px',
+                            fontSize: '12.5px',
+                            fontWeight: isActive ? '700' : '500',
+                            border: isActive ? '1px solid rgba(6, 182, 212, 0.5)' : '1px solid var(--admin-border)',
+                            background: isActive ? 'rgba(6, 182, 212, 0.16)' : 'rgba(255, 255, 255, 0.03)',
+                            color: isActive ? '#38bdf8' : 'var(--admin-text-muted)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <span>{f.label}</span>
+                          <span style={{
+                            fontSize: '11px',
+                            padding: '1px 6px',
+                            borderRadius: '10px',
+                            background: isActive ? 'rgba(6, 182, 212, 0.25)' : 'rgba(255, 255, 255, 0.06)',
+                            color: isActive ? '#ffffff' : 'var(--admin-text-muted)',
+                            fontWeight: '700'
+                          }}>
+                            {f.count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Notification List Container */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {(() => {
+                      const filtered = publicNotifications.filter(n =>
+                        publicNotificationFilter === 'all' || n.category === publicNotificationFilter
+                      );
+
+                      if (filtered.length === 0) {
+                        return (
+                          <div className="admin-panel" style={{ padding: '48px 24px', textAlign: 'center' }}>
+                            <Bell size={36} style={{ color: 'var(--admin-text-muted)', opacity: 0.5, marginBottom: '12px' }} />
+                            <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--admin-text-main)', margin: '0 0 6px' }}>
+                              No Notifications Found
+                            </h3>
+                            <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px', margin: 0, maxWidth: '420px', marginLeft: 'auto', marginRight: 'auto' }}>
+                              {publicNotificationFilter === 'all'
+                                ? "There are currently no active public alerts or advisories for Kottayam corridors."
+                                : `No notifications currently logged in the '${publicNotificationFilter}' category.`}
+                            </p>
+                            {publicNotificationFilter !== 'all' && (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                style={{ marginTop: '16px', borderColor: 'var(--admin-border)' }}
+                                onClick={() => setPublicNotificationFilter('all')}
+                              >
+                                View All Notifications
+                              </button>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      return filtered.map(notif => {
+                        const isRead = readNotificationIds.includes(notif.id);
+
+                        // Icon and accent colors based on category and status
+                        let IconComp = Bell;
+                        let iconColor = '#06b6d4';
+                        let iconBg = 'rgba(6, 182, 212, 0.12)';
+                        let categoryLabel = 'TRAFFIC ALERT';
+
+                        if (notif.category === 'incident') {
+                          categoryLabel = `INCIDENT ${notif.status ? notif.status.toUpperCase() : 'UPDATE'}`;
+                          if (notif.status === 'Resolved') {
+                            IconComp = CheckCircle;
+                            iconColor = '#10b981';
+                            iconBg = 'rgba(16, 185, 129, 0.14)';
+                          } else if (notif.status === 'Verified') {
+                            IconComp = CheckCircle;
+                            iconColor = '#06b6d4';
+                            iconBg = 'rgba(6, 182, 212, 0.14)';
+                          } else {
+                            IconComp = Clock;
+                            iconColor = '#f59e0b';
+                            iconBg = 'rgba(245, 158, 11, 0.14)';
+                          }
+                        } else if (notif.category === 'transit') {
+                          categoryLabel = 'TRANSIT & SIGNALS';
+                          IconComp = Activity;
+                          iconColor = '#38bdf8';
+                          iconBg = 'rgba(56, 189, 248, 0.14)';
+                        } else if (notif.category === 'weather') {
+                          categoryLabel = 'WEATHER & ROAD CONDITIONS';
+                          IconComp = CloudRain;
+                          iconColor = '#0ea5e9';
+                          iconBg = 'rgba(14, 165, 233, 0.14)';
+                        } else if (notif.category === 'announcement') {
+                          categoryLabel = 'SYSTEM BULLETIN';
+                          IconComp = Info;
+                          iconColor = '#a855f7';
+                          iconBg = 'rgba(168, 85, 247, 0.14)';
+                        }
+
+                        const isHighPriority = notif.priority === 'Critical' || notif.priority === 'High';
+
+                        return (
+                          <div
+                            key={notif.id}
+                            className="admin-panel"
+                            style={{
+                              padding: '18px 20px',
+                              background: isRead
+                                ? 'rgba(11, 20, 36, 0.7)'
+                                : 'linear-gradient(135deg, rgba(6, 182, 212, 0.08) 0%, rgba(11, 20, 36, 0.95) 100%)',
+                              border: isRead
+                                ? '1px solid rgba(255, 255, 255, 0.06)'
+                                : '1px solid rgba(6, 182, 212, 0.35)',
+                              boxShadow: isRead ? 'none' : '0 4px 20px rgba(6, 182, 212, 0.08)',
+                              borderRadius: '12px',
+                              display: 'flex',
+                              gap: '16px',
+                              alignItems: 'flex-start',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {/* Icon Avatar */}
+                            <div style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '10px',
+                              background: iconBg,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              marginTop: '2px'
+                            }}>
+                              <IconComp size={20} style={{ color: iconColor }} />
+                            </div>
+
+                            {/* Main Body */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '4px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <span style={{
+                                    fontSize: '10.5px',
+                                    fontWeight: '800',
+                                    letterSpacing: '0.06em',
+                                    color: iconColor,
+                                    background: iconBg,
+                                    padding: '2px 8px',
+                                    borderRadius: '5px'
+                                  }}>
+                                    {categoryLabel}
+                                  </span>
+
+                                  {notif.priority && (
+                                    <span style={{
+                                      fontSize: '10.5px',
+                                      fontWeight: '700',
+                                      padding: '2px 7px',
+                                      borderRadius: '5px',
+                                      background: isHighPriority ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.06)',
+                                      color: isHighPriority ? '#ef4444' : 'rgba(255, 255, 255, 0.65)'
+                                    }}>
+                                      {notif.priority} Priority
+                                    </span>
+                                  )}
+
+                                  {notif.status && (
+                                    <span style={{
+                                      fontSize: '10.5px',
+                                      fontWeight: '600',
+                                      padding: '2px 7px',
+                                      borderRadius: '5px',
+                                      background: notif.status === 'Resolved' ? 'rgba(16, 185, 129, 0.15)' : (notif.status === 'Verified' ? 'rgba(6, 182, 212, 0.15)' : 'rgba(245, 158, 11, 0.15)'),
+                                      color: notif.status === 'Resolved' ? '#10b981' : (notif.status === 'Verified' ? '#38bdf8' : '#f59e0b')
+                                    }}>
+                                      {notif.status}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <span style={{ fontSize: '11.5px', color: 'var(--admin-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <Clock size={12} /> {notif.time || 'Recent'}
+                                  </span>
+                                  {!isRead && (
+                                    <span style={{
+                                      fontSize: '9.5px',
+                                      fontWeight: '800',
+                                      letterSpacing: '0.05em',
+                                      background: '#0284c7',
+                                      color: '#ffffff',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px'
+                                    }}>
+                                      NEW
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <h3 style={{
+                                fontSize: '14.5px',
+                                fontWeight: '700',
+                                color: isRead ? 'rgba(255, 255, 255, 0.9)' : '#ffffff',
+                                margin: '0 0 6px'
+                              }}>
+                                {notif.title}
+                              </h3>
+
+                              <p style={{
+                                fontSize: '13px',
+                                lineHeight: '1.5',
+                                color: isRead ? 'rgba(255, 255, 255, 0.65)' : 'rgba(255, 255, 255, 0.85)',
+                                margin: '0 0 10px'
+                              }}>
+                                {notif.message}
+                              </p>
+
+                              {/* Footer Details & Quick Action Buttons */}
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                flexWrap: 'wrap',
+                                gap: '10px',
+                                paddingTop: '8px',
+                                borderTop: '1px solid rgba(255, 255, 255, 0.05)'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                                  {notif.location && (
+                                    <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                      <MapPin size={13} style={{ color: 'var(--admin-accent-cyan)' }} />
+                                      {notif.location}
+                                    </span>
+                                  )}
+                                  {notif.incident_id && (
+                                    <span style={{
+                                      fontSize: '11px',
+                                      fontFamily: 'monospace',
+                                      fontWeight: '700',
+                                      padding: '1px 6px',
+                                      background: 'rgba(255, 255, 255, 0.06)',
+                                      borderRadius: '4px',
+                                      color: 'rgba(255, 255, 255, 0.8)'
+                                    }}>
+                                      {notif.incident_id}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  {notif.category === 'incident' && (
+                                    <button
+                                      onClick={() => {
+                                        setPublicActiveTab('incidents');
+                                        addToast('Switched to Incident Tracker view.', 'info');
+                                      }}
+                                      style={{
+                                        background: 'transparent',
+                                        border: '1px solid rgba(6, 182, 212, 0.3)',
+                                        color: '#38bdf8',
+                                        fontSize: '11.5px',
+                                        fontWeight: '600',
+                                        padding: '4px 10px',
+                                        borderRadius: '6px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '5px'
+                                      }}
+                                    >
+                                      Track in Feed <ExternalLink size={11} />
+                                    </button>
+                                  )}
+
+                                  {!isRead ? (
+                                    <button
+                                      onClick={() => markNotificationAsRead(notif.id)}
+                                      style={{
+                                        background: 'rgba(255, 255, 255, 0.06)',
+                                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                                        color: 'rgba(255, 255, 255, 0.85)',
+                                        fontSize: '11.5px',
+                                        fontWeight: '500',
+                                        padding: '4px 10px',
+                                        borderRadius: '6px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}
+                                    >
+                                      <Check size={12} /> Mark Read
+                                    </button>
+                                  ) : (
+                                    <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.35)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                      <CheckCircle size={11} /> Read
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+              )}
+
+              {publicActiveTab === 'profile' && (
+                <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+                  {/* Title & Info */}
+                  <div className="admin-title-row">
+                    <div>
+                      <h1 style={{ fontSize: '24px', fontWeight: '800', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <User size={24} style={{ color: 'var(--admin-accent-cyan)' }} /> Citizen Profile & Settings
+                      </h1>
+                      <div className="admin-subtitle">
+                        Manage your public commuter profile, security credentials, and track your submitted traffic incident reports.
+                      </div>
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const userIncidents = publicIncidents.filter(inc => {
+                      if (!currentUser) return false;
+                      const cName = (currentUser.name || '').trim().toLowerCase();
+                      const cEmail = (currentUser.email || '').trim().toLowerCase();
+                      const rep = (inc.reportedBy || '').trim().toLowerCase();
+                      return rep && (rep === cName || rep === cEmail);
+                    });
+                    const userResolved = userIncidents.filter(i => (i.status || '').toUpperCase() === 'RESOLVED').length;
+                    const userVerified = userIncidents.filter(i => (i.status || '').toUpperCase() === 'VERIFIED').length;
+
+                    // Derive initials for avatar
+                    const initials = (currentUser?.name || currentUser?.email || 'U')
+                      .split(' ')
+                      .map(p => p[0])
+                      .slice(0, 2)
+                      .join('')
+                      .toUpperCase();
+
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1.15fr) minmax(320px, 1fr)', gap: '20px', alignItems: 'start' }}>
+                        {/* LEFT COLUMN: Identity Hero + Personal Information Form */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                          {/* Identity Hero Card */}
+                          <div className="admin-panel" style={{
+                            padding: '24px',
+                            background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.08) 0%, rgba(15, 23, 42, 0.9) 100%)',
+                            border: '1px solid rgba(6, 182, 212, 0.25)',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' }}>
+                              <div style={{
+                                width: '64px',
+                                height: '64px',
+                                borderRadius: '50%',
+                                background: 'linear-gradient(135deg, #0284c7 0%, #06b6d4 100%)',
+                                color: '#ffffff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '22px',
+                                fontWeight: '800',
+                                letterSpacing: '0.05em',
+                                boxShadow: '0 0 20px rgba(6, 182, 212, 0.35)',
+                                flexShrink: 0
+                              }}>
+                                {initials}
+                              </div>
+
+                              <div style={{ flex: 1, minWidth: '180px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#ffffff', margin: 0 }}>
+                                    {currentUser?.name || 'Citizen Commuter'}
+                                  </h2>
+                                  <span style={{
+                                    fontSize: '11px',
+                                    fontWeight: '700',
+                                    color: '#10b981',
+                                    background: 'rgba(16, 185, 129, 0.14)',
+                                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                                    padding: '2px 8px',
+                                    borderRadius: '12px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}>
+                                    <Shield size={11} /> Verified Citizen
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '13px', color: 'var(--admin-text-muted)', marginTop: '4px' }}>
+                                  {currentUser?.email || 'citizen@urbanflow.local'}
+                                </div>
+                                <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <MapPin size={12} style={{ color: 'var(--admin-accent-cyan)' }} />
+                                  {currentUser?.city || 'Kottayam, Kerala'} &bull; Baker Jn Corridor
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Citizen Impact Stats */}
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(3, 1fr)',
+                              gap: '12px',
+                              marginTop: '20px',
+                              paddingTop: '16px',
+                              borderTop: '1px solid rgba(255, 255, 255, 0.08)'
+                            }}>
+                              <div style={{
+                                background: 'rgba(255, 255, 255, 0.03)',
+                                padding: '10px 12px',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(255, 255, 255, 0.05)',
+                                textAlign: 'center'
+                              }}>
+                                <div style={{ fontSize: '18px', fontWeight: '800', color: '#38bdf8' }}>
+                                  {userIncidents.length}
+                                </div>
+                                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', marginTop: '2px' }}>
+                                  Reports Filed
+                                </div>
+                              </div>
+
+                              <div style={{
+                                background: 'rgba(255, 255, 255, 0.03)',
+                                padding: '10px 12px',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(255, 255, 255, 0.05)',
+                                textAlign: 'center'
+                              }}>
+                                <div style={{ fontSize: '18px', fontWeight: '800', color: '#10b981' }}>
+                                  {userVerified + userResolved}
+                                </div>
+                                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', marginTop: '2px' }}>
+                                  Handled / Resolved
+                                </div>
+                              </div>
+
+                              <div style={{
+                                background: 'rgba(255, 255, 255, 0.03)',
+                                padding: '10px 12px',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(255, 255, 255, 0.05)',
+                                textAlign: 'center'
+                              }}>
+                                <div style={{ fontSize: '18px', fontWeight: '800', color: '#a855f7' }}>
+                                  100%
+                                </div>
+                                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', marginTop: '2px' }}>
+                                  Community Trust
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Personal Information Form */}
+                          <div className="admin-panel" style={{ padding: '24px' }}>
+                            <div style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '14px', marginBottom: '18px' }}>
+                              <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#ffffff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <UserCheck size={18} style={{ color: 'var(--admin-accent-cyan)' }} /> Personal Information
+                              </h3>
+                              <p style={{ fontSize: '12.5px', color: 'var(--admin-text-muted)', margin: '4px 0 0' }}>
+                                Keep your contact details up to date for emergency alerts and incident verifications.
+                              </p>
+                            </div>
+
+                            <form onSubmit={handleProfileSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                              <div className="form-group">
+                                <label className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px', fontWeight: '600' }}>
+                                  Full Name *
+                                </label>
+                                <div style={{ position: 'relative' }}>
+                                  <User size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255, 255, 255, 0.4)' }} />
+                                  <input
+                                    type="text"
+                                    className="form-control"
+                                    style={{ paddingLeft: '36px', background: '#09111e', border: '1px solid var(--admin-border)', color: 'white', fontSize: '13px' }}
+                                    value={profileName}
+                                    onChange={(e) => setProfileName(e.target.value)}
+                                    placeholder="Enter full name"
+                                    required
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="form-group">
+                                <label className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px', fontWeight: '600' }}>
+                                  Email Address
+                                </label>
+                                <div style={{ position: 'relative' }}>
+                                  <Mail size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255, 255, 255, 0.3)' }} />
+                                  <input
+                                    type="email"
+                                    className="form-control"
+                                    style={{ paddingLeft: '36px', background: '#070c16', border: '1px solid rgba(255, 255, 255, 0.06)', color: 'rgba(255, 255, 255, 0.65)', fontSize: '13px', cursor: 'not-allowed' }}
+                                    value={currentUser?.email || ''}
+                                    disabled
+                                  />
+                                </div>
+                                <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)', marginTop: '4px', display: 'block' }}>
+                                  Official account email tied to your UrbanFlow login credentials.
+                                </span>
+                              </div>
+
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                                <div className="form-group">
+                                  <label className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px', fontWeight: '600' }}>
+                                    Phone Number
+                                  </label>
+                                  <div style={{ position: 'relative' }}>
+                                    <Phone size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255, 255, 255, 0.4)' }} />
+                                    <input
+                                      type="text"
+                                      className="form-control"
+                                      style={{ paddingLeft: '36px', background: '#09111e', border: '1px solid var(--admin-border)', color: 'white', fontSize: '13px' }}
+                                      placeholder="+91 98765 43210"
+                                      value={profilePhone}
+                                      onChange={(e) => setProfilePhone(e.target.value)}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="form-group">
+                                  <label className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px', fontWeight: '600' }}>
+                                    Primary Region / City
+                                  </label>
+                                  <div style={{ position: 'relative' }}>
+                                    <MapPin size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255, 255, 255, 0.4)' }} />
+                                    <input
+                                      type="text"
+                                      className="form-control"
+                                      style={{ paddingLeft: '36px', background: '#09111e', border: '1px solid var(--admin-border)', color: 'white', fontSize: '13px' }}
+                                      placeholder="Kottayam, Kerala"
+                                      value={profileCity}
+                                      onChange={(e) => setProfileCity(e.target.value)}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <button
+                                type="submit"
+                                disabled={isSavingProfile}
+                                className="btn btn-primary"
+                                style={{
+                                  height: '42px',
+                                  marginTop: '6px',
+                                  justifyContent: 'center',
+                                  fontSize: '13px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {isSavingProfile ? (
+                                  <>
+                                    <RefreshCw size={14} className="spin" /> Saving Changes...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Save size={14} /> Save Profile Changes
+                                  </>
+                                )}
+                              </button>
+                            </form>
+                          </div>
+                        </div>
+
+                        {/* RIGHT COLUMN: Password & Security + User Incident Reports History */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                          {/* Security & Password Card */}
+                          <div className="admin-panel" style={{ padding: '24px' }}>
+                            <div style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '14px', marginBottom: '18px' }}>
+                              <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#ffffff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Key size={18} style={{ color: 'var(--admin-accent-cyan)' }} /> Security & Password
+                              </h3>
+                              <p style={{ fontSize: '12.5px', color: 'var(--admin-text-muted)', margin: '4px 0 0' }}>
+                                Update your commuter account password to protect access.
+                              </p>
+                            </div>
+
+                            <form onSubmit={handleProfilePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                              <div className="form-group">
+                                <label className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px', fontWeight: '600' }}>
+                                  Current Password *
+                                </label>
+                                <div style={{ position: 'relative' }}>
+                                  <Lock size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255, 255, 255, 0.4)' }} />
+                                  <input
+                                    type={showPwdCurrent ? 'text' : 'password'}
+                                    className="form-control"
+                                    style={{ paddingLeft: '36px', paddingRight: '36px', background: '#09111e', border: '1px solid var(--admin-border)', color: 'white', fontSize: '13px' }}
+                                    placeholder="Enter current password"
+                                    value={pwdCurrent}
+                                    onChange={(e) => setPwdCurrent(e.target.value)}
+                                    required
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowPwdCurrent(!showPwdCurrent)}
+                                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: '4px' }}
+                                  >
+                                    {showPwdCurrent ? <EyeOff size={15} /> : <Eye size={15} />}
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="form-group">
+                                <label className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px', fontWeight: '600' }}>
+                                  New Password *
+                                </label>
+                                <div style={{ position: 'relative' }}>
+                                  <Lock size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255, 255, 255, 0.4)' }} />
+                                  <input
+                                    type={showPwdNew ? 'text' : 'password'}
+                                    className="form-control"
+                                    style={{ paddingLeft: '36px', paddingRight: '36px', background: '#09111e', border: '1px solid var(--admin-border)', color: 'white', fontSize: '13px' }}
+                                    placeholder="Minimum 6 characters"
+                                    value={pwdNew}
+                                    onChange={(e) => setPwdNew(e.target.value)}
+                                    required
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowPwdNew(!showPwdNew)}
+                                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: '4px' }}
+                                  >
+                                    {showPwdNew ? <EyeOff size={15} /> : <Eye size={15} />}
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="form-group">
+                                <label className="form-label" style={{ color: 'var(--admin-text-muted)', fontSize: '12px', fontWeight: '600' }}>
+                                  Confirm New Password *
+                                </label>
+                                <div style={{ position: 'relative' }}>
+                                  <Lock size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255, 255, 255, 0.4)' }} />
+                                  <input
+                                    type={showPwdConfirm ? 'text' : 'password'}
+                                    className="form-control"
+                                    style={{ paddingLeft: '36px', paddingRight: '36px', background: '#09111e', border: '1px solid var(--admin-border)', color: 'white', fontSize: '13px' }}
+                                    placeholder="Re-enter new password"
+                                    value={pwdConfirm}
+                                    onChange={(e) => setPwdConfirm(e.target.value)}
+                                    required
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowPwdConfirm(!showPwdConfirm)}
+                                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: '4px' }}
+                                  >
+                                    {showPwdConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
+                                  </button>
+                                </div>
+                                {pwdConfirm && (
+                                  <span style={{
+                                    fontSize: '11px',
+                                    marginTop: '4px',
+                                    display: 'block',
+                                    color: pwdNew === pwdConfirm ? '#10b981' : '#ef4444'
+                                  }}>
+                                    {pwdNew === pwdConfirm ? '✓ Passwords match' : '✗ Passwords do not match'}
+                                  </span>
+                                )}
+                              </div>
+
+                              <button
+                                type="submit"
+                                disabled={isUpdatingPassword || (pwdConfirm && pwdNew !== pwdConfirm)}
+                                className="btn btn-ghost"
+                                style={{
+                                  height: '40px',
+                                  marginTop: '4px',
+                                  justifyContent: 'center',
+                                  fontSize: '13px',
+                                  fontWeight: '700',
+                                  borderColor: 'var(--admin-border)',
+                                  color: 'white',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {isUpdatingPassword ? (
+                                  <>
+                                    <RefreshCw size={14} className="spin" /> Updating Password...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Lock size={14} /> Update Password
+                                  </>
+                                )}
+                              </button>
+                            </form>
+                          </div>
+
+                          {/* My Reported Incidents History Card */}
+                          <div className="admin-panel" style={{ padding: '24px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '14px', marginBottom: '16px' }}>
+                              <div>
+                                <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#ffffff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <FileText size={18} style={{ color: 'var(--admin-accent-cyan)' }} /> My Incident Reports
+                                </h3>
+                                <p style={{ fontSize: '12px', color: 'var(--admin-text-muted)', margin: '3px 0 0' }}>
+                                  Track status updates on your community contributions.
+                                </p>
+                              </div>
+                              <span style={{
+                                fontSize: '11px',
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                background: 'rgba(6, 182, 212, 0.15)',
+                                color: '#38bdf8',
+                                fontWeight: '700'
+                              }}>
+                                {userIncidents.length} Submitted
+                              </span>
+                            </div>
+
+                            {userIncidents.length === 0 ? (
+                              <div style={{ textAlign: 'center', padding: '24px 12px' }}>
+                                <AlertTriangle size={32} style={{ color: 'var(--admin-text-muted)', opacity: 0.4, marginBottom: '8px' }} />
+                                <div style={{ fontSize: '13.5px', fontWeight: '600', color: 'rgba(255, 255, 255, 0.8)' }}>
+                                  No Reports Submitted Yet
+                                </div>
+                                <p style={{ fontSize: '12px', color: 'var(--admin-text-muted)', margin: '4px auto 14px', maxWidth: '300px' }}>
+                                  Notice congestion, signal failures, rash driving, or road hazards in Kottayam? Report them directly to Traffic Control.
+                                </p>
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-sm"
+                                  onClick={() => setPublicActiveTab('incidents')}
+                                  style={{ fontSize: '12px', margin: '0 auto' }}
+                                >
+                                  Report an Incident Now
+                                </button>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '340px', overflowY: 'auto', paddingRight: '4px' }}>
+                                {userIncidents.map(inc => {
+                                  const meta = getIncidentTypeMeta(inc.type);
+                                  const IconComponent = meta.icon;
+                                  const statusUpper = (inc.status || '').toUpperCase();
+                                  const isResolved = statusUpper === 'RESOLVED';
+                                  const isVerified = statusUpper === 'VERIFIED';
+
+                                  return (
+                                    <div
+                                      key={inc.id}
+                                      style={{
+                                        padding: '12px 14px',
+                                        background: 'rgba(255, 255, 255, 0.02)',
+                                        border: '1px solid rgba(255, 255, 255, 0.06)',
+                                        borderRadius: '8px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '6px'
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                          <IconComponent size={14} style={{ color: meta.color }} />
+                                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#ffffff' }}>
+                                            {inc.type}
+                                          </span>
+                                        </div>
+                                        <span style={{
+                                          fontSize: '10.5px',
+                                          fontWeight: '700',
+                                          padding: '2px 7px',
+                                          borderRadius: '5px',
+                                          background: isResolved ? 'rgba(16, 185, 129, 0.15)' : (isVerified ? 'rgba(6, 182, 212, 0.15)' : 'rgba(245, 158, 11, 0.15)'),
+                                          color: isResolved ? '#10b981' : (isVerified ? '#38bdf8' : '#f59e0b')
+                                        }}>
+                                          {isResolved ? 'Resolved' : (isVerified ? 'Verified' : 'Pending')}
+                                        </span>
+                                      </div>
+
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11.5px', color: 'var(--admin-text-muted)' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                          <MapPin size={11} style={{ color: 'var(--admin-accent-cyan)' }} />
+                                          {inc.location}
+                                        </span>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                          <Clock size={11} />
+                                          {inc.time || 'Recent'}
+                                        </span>
+                                      </div>
+
+                                      {inc.description && (
+                                        <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.4' }}>
+                                          {inc.description}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </main>
