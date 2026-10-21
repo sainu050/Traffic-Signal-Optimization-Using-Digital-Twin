@@ -12,7 +12,7 @@ import traci
 from pedestrian_manager import PedestrianManager
 
 class TrafficSimulation:
-    def __init__(self):
+    def __init__(self, autostart: bool = False):
         self.signals = {
             "north": "green",
             "east": "red",
@@ -27,9 +27,13 @@ class TrafficSimulation:
         }
         self.pedestrian_manager = PedestrianManager()
         self.sumo_started = False
-        self.start_sumo()
+        if autostart:
+            self.start_sumo()
 
     def start_sumo(self):
+        if self.sumo_started:
+            return
+            
         sumo_binary = os.path.join(os.environ.get("SUMO_HOME", ""), "bin", "sumo")
         if os.name == 'nt':
             sumo_binary += ".exe"
@@ -41,34 +45,53 @@ class TrafficSimulation:
             
         sumo_cfg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sumo_files", "sumo.sumocfg")
         
-        # Kill any orphaned SUMO processes to free up port 8813
+        # Kill any orphaned SUMO processes to free up ports
         if os.name == 'nt':
             os.system("taskkill /f /im sumo.exe >nul 2>&1")
             import time
-            time.sleep(0.5)
+            time.sleep(0.3)
         else:
             os.system("pkill -9 -f sumo >/dev/null 2>&1")
             import time
-            time.sleep(0.5)
+            time.sleep(0.3)
             
         # Start SUMO in background via TraCI
         # --no-warnings suppresses console noise, --no-step-log disables step terminal logs
-        # --step-length 0.08 accelerates simulation speed to 1.6x - 2.0x real-time for smooth, responsive movement
-        traci.start([
-            sumo_binary, 
-            "-c", sumo_cfg, 
-            "--no-warnings", 
-            "--no-step-log",
-            "--step-length", "0.08"
-        ], numRetries=20)
-        self.sumo_started = True
+        # --xml-validation never eliminates Xerces XML schema overhead (~100-150MB savings)
+        # --threads 1 minimizes thread stack overhead
+        # --duration-log.disable avoids keeping duration stats in memory
+        # --step-length 0.08 accelerates simulation speed to 1.6x - 2.0x real-time
+        try:
+            traci.start([
+                sumo_binary, 
+                "-c", sumo_cfg, 
+                "--no-warnings", 
+                "--no-step-log",
+                "--xml-validation", "never",
+                "--threads", "1",
+                "--duration-log.disable",
+                "--step-length", "0.08"
+            ], numRetries=20)
+            self.sumo_started = True
+            print("[SUMO] TraCI engine initialized successfully.")
+        except Exception as e:
+            print(f"[SUMO] Failed to start SUMO: {e}")
+            self.sumo_started = False
 
     def reload(self):
         sumo_cfg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sumo_files", "sumo.sumocfg")
         self.pedestrian_manager.reset()
         if self.sumo_started:
             try:
-                traci.load(["-c", sumo_cfg, "--no-warnings", "--no-step-log", "--step-length", "0.08"])
+                traci.load([
+                    "-c", sumo_cfg, 
+                    "--no-warnings", 
+                    "--no-step-log", 
+                    "--xml-validation", "never",
+                    "--threads", "1",
+                    "--duration-log.disable",
+                    "--step-length", "0.08"
+                ])
                 return True
             except Exception:
                 pass

@@ -5,6 +5,7 @@ FROM python:3.11-slim
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONMALLOC=malloc
+ENV MALLOC_TRIM_THRESHOLD_=65536
 ENV SUMO_HOME=/usr/share/sumo
 
 # Install SUMO, SUMO tools, PostgreSQL client runtime, and procps (for pkill)

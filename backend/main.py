@@ -1454,7 +1454,7 @@ from database import SessionLocal
 from simulation import TrafficSimulation
 import asyncio
 
-sim = TrafficSimulation()
+sim = TrafficSimulation(autostart=False)
 
 class ConnectionManager:
     def __init__(self):
@@ -1497,8 +1497,54 @@ def run_simulation_thread():
     step_counter = 0
     signals = {"north": "green", "east": "red", "south": "red", "west": "red"}
     state_string = "GGGGrrrrrrrrrrrr"
+    idle_ticks = 0
+
+    # Initialize SUMO in background thread so HTTP server boots instantaneously
+    try:
+        if not sim.sumo_started:
+            sim.start_sumo()
+    except Exception as e:
+        print(f"[SUMO] Background initialization note: {e}")
     
     while True:
+        # Check active WebSocket clients
+        active_clients = len(manager.active_connections)
+        
+        # When no client is watching the live simulation, idle at 1Hz to conserve CPU and RAM
+        if active_clients == 0:
+            time.sleep(1.0)
+            idle_ticks += 1
+            if idle_ticks % 30 == 0:
+                import gc
+                gc.collect()
+            
+            # Still update signal timers in DB if an override is active
+            try:
+                db = SessionLocal()
+                try:
+                    active_id = get_active_intersection_id(db)
+                    sig = db.query(TrafficSignal).filter(TrafficSignal.intersection_id == active_id).order_by(TrafficSignal.signal_id.desc()).first()
+                    if sig and sig.mode == "MANUAL":
+                        if sig.green_time and sig.green_time > 0:
+                            sig.green_time -= 1
+                            db.commit()
+                        else:
+                            sig.mode = "AUTO"
+                            sig.current_state = "north_green"
+                            db.commit()
+                finally:
+                    db.close()
+            except Exception:
+                pass
+            continue
+            
+        # Active client is connected: ensure SUMO is running and step at 25 FPS
+        if not sim.sumo_started:
+            try:
+                sim.start_sumo()
+            except Exception:
+                pass
+
         time.sleep(0.04) # 25 FPS (every 40ms)
         step_counter += 1
         
@@ -1701,7 +1747,7 @@ def run_simulation_thread():
                 db.close()
             
         sim.step()
-        if main_loop is not None:
+        if main_loop is not None and len(manager.active_connections) > 0:
             asyncio.run_coroutine_threadsafe(manager.broadcast(sim.get_state()), main_loop)
 
 @app.on_event("startup")
