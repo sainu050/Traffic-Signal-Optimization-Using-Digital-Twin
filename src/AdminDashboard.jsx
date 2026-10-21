@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { API_BASE_URL } from './config'
 import SimulationCanvas from './SimulationCanvas'
 import {
   Sliders, Route, Users, Activity, FileText, 
@@ -110,7 +111,7 @@ export default function AdminDashboard({
   // Notification API Handlers
   const fetchNotifications = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/admin/notifications')
+      const res = await fetch(`${API_BASE_URL}/api/admin/notifications`)
       if (res.ok) {
         const data = await res.json()
         const rawNotifs = data.notifications || []
@@ -155,7 +156,7 @@ export default function AdminDashboard({
   const handleMarkNotificationRead = async (id, e) => {
     if (e) e.stopPropagation()
     try {
-      const res = await fetch(`http://localhost:8000/api/admin/notifications/${id}/read`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/notifications/${id}/read`, {
         method: 'PUT'
       })
       if (res.ok) {
@@ -169,7 +170,7 @@ export default function AdminDashboard({
 
   const handleMarkAllNotificationsRead = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/admin/notifications/read-all', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/notifications/read-all`, {
         method: 'PUT'
       })
       if (res.ok) {
@@ -204,7 +205,7 @@ export default function AdminDashboard({
   // Load active operational database resources on mount
   const fetchData = async () => {
     try {
-      const resInt = await fetch('http://localhost:8000/api/intersections')
+      const resInt = await fetch(`${API_BASE_URL}/api/intersections`)
       if (resInt.ok) {
         const dataInt = await resInt.json()
         setLocalIntersections(dataInt)
@@ -215,7 +216,7 @@ export default function AdminDashboard({
         if (setIntersections) setIntersections(dataInt)
       }
       
-      const resOp = await fetch('http://localhost:8000/api/operators')
+      const resOp = await fetch(`${API_BASE_URL}/api/operators`)
       if (resOp.ok) {
         const dataOp = await resOp.json()
         setOperators(dataOp)
@@ -224,19 +225,19 @@ export default function AdminDashboard({
         }
       }
 
-      const resCit = await fetch('http://localhost:8000/api/citizens')
+      const resCit = await fetch(`${API_BASE_URL}/api/citizens`)
       if (resCit.ok) {
         const dataCit = await resCit.json()
         setCitizens(dataCit)
       }
 
-      const resInc = await fetch('http://localhost:8000/api/incidents')
+      const resInc = await fetch(`${API_BASE_URL}/api/incidents`)
       if (resInc.ok) {
         const dataInc = await resInc.json()
         setIncidents(dataInc)
       }
 
-      const resLogs = await fetch('http://localhost:8000/api/logs')
+      const resLogs = await fetch(`${API_BASE_URL}/api/logs`)
       if (resLogs.ok) {
         const dataLogs = await resLogs.json()
         setAuditLogs(dataLogs.map(l => ({
@@ -292,13 +293,13 @@ export default function AdminDashboard({
   const logAction = (action, target, user = currentUser ? `${currentUser.name} (${currentUser.role})` : 'Dr. Raj Patel (Admin)') => {
     const time = new Date().toLocaleTimeString()
     
-    fetch('http://localhost:8000/api/logs', {
+    fetch(`${API_BASE_URL}/api/logs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_name: user, action, target })
     }).then(res => {
       if (res.ok) {
-        fetch('http://localhost:8000/api/logs')
+        fetch(`${API_BASE_URL}/api/logs`)
           .then(r => r.json())
           .then(dataLogs => {
             setAuditLogs(dataLogs.map(l => ({
@@ -316,7 +317,7 @@ export default function AdminDashboard({
     e.preventDefault()
     const targetId = parseInt(overrideTargetId)
     
-    fetch(`http://localhost:8000/api/intersections/${targetId}/override`, {
+    fetch(`${API_BASE_URL}/api/intersections/${targetId}/override`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -361,7 +362,7 @@ export default function AdminDashboard({
     
     const assignedInt = newOpInt || 'Unassigned'
     
-    fetch('http://localhost:8000/api/operators', {
+    fetch(`${API_BASE_URL}/api/operators`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -376,7 +377,7 @@ export default function AdminDashboard({
       const errData = await res.json().catch(() => ({}))
       throw new Error(errData.detail || 'Failed to create operator.')
     }).then(data => {
-      fetch('http://localhost:8000/api/operators')
+      fetch(`${API_BASE_URL}/api/operators`)
         .then(r => r.json())
         .then(dataOp => setOperators(dataOp))
         
@@ -404,13 +405,13 @@ export default function AdminDashboard({
       return
     }
     
-    fetch('http://localhost:8000/api/intersections', {
+    fetch(`${API_BASE_URL}/api/intersections`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newIntName })
     }).then(res => {
       if (res.ok) {
-        fetch('http://localhost:8000/api/intersections')
+        fetch(`${API_BASE_URL}/api/intersections`)
           .then(r => r.json())
           .then(dataInt => {
             setLocalIntersections(dataInt)
@@ -435,7 +436,7 @@ export default function AdminDashboard({
     const intersection = localIntersections.find(i => i.id === parseInt(selectedIntId))
     if (!op || !intersection) return
 
-    fetch(`http://localhost:8000/api/operators/${op.db_id}/assign`, {
+    fetch(`${API_BASE_URL}/api/operators/${op.db_id}/assign`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ assignedIntersection: intersection.name })
@@ -484,7 +485,7 @@ export default function AdminDashboard({
 
   const handleIncidentResolve = async (incId) => {
     try {
-      await fetch(`http://localhost:8000/api/incidents/${incId}/status`, {
+      await fetch(`${API_BASE_URL}/api/incidents/${incId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'RESOLVED', verified_by: currentUser?.name || 'Sys Admin' })
@@ -503,7 +504,7 @@ export default function AdminDashboard({
 
   const handleIncidentVerify = async (incId) => {
     try {
-      await fetch(`http://localhost:8000/api/incidents/${incId}/status`, {
+      await fetch(`${API_BASE_URL}/api/incidents/${incId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'VERIFIED', verified_by: currentUser?.name || 'Sys Admin' })
@@ -1404,7 +1405,7 @@ export default function AdminDashboard({
                               const selectedInt = localIntersections.find(i => i.id === selectedId)
                               const nextName = selectedInt ? selectedInt.name : 'Unassigned'
                               
-                              fetch(`http://localhost:8000/api/operators/${op.db_id}/assign`, {
+                              fetch(`${API_BASE_URL}/api/operators/${op.db_id}/assign`, {
                                 method: 'PUT',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ assignedIntersection: nextName })
@@ -1527,7 +1528,7 @@ export default function AdminDashboard({
                               onClick={async () => {
                                 try {
                                   const userId = op.db_id || parseInt(op.id.replace('OP-', ''));
-                                  const res = await fetch(`http://localhost:8000/api/users/${userId}`, { method: 'DELETE' });
+                                  const res = await fetch(`${API_BASE_URL}/api/users/${userId}`, { method: 'DELETE' });
                                   if (res.ok) {
                                     setOperators(prev => prev.filter(o => o.id !== op.id));
                                     logAction('Deleted Operator Account', `${op.name} (${op.id})`);
@@ -1767,7 +1768,7 @@ export default function AdminDashboard({
                             onClick={async () => {
                               try {
                                 const userId = cit.db_id || parseInt(cit.id.replace('CIT-', ''));
-                                const res = await fetch(`http://localhost:8000/api/users/${userId}`, { method: 'DELETE' });
+                                const res = await fetch(`${API_BASE_URL}/api/users/${userId}`, { method: 'DELETE' });
                                 if (res.ok) {
                                   setCitizens(prev => prev.filter(c => c.id !== cit.id));
                                   logAction('Deleted Citizen Account', `${cit.name} (${cit.id})`);

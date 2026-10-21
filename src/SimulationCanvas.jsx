@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { WS_BASE_URL } from './config'
 
 export default function SimulationCanvas({ onMetricsUpdate }) {
   const canvasRef = useRef(null)
@@ -12,7 +13,7 @@ export default function SimulationCanvas({ onMetricsUpdate }) {
 
   // Establish WebSocket Connection
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8000/api/simulation/ws')
+    const ws = new WebSocket(`${WS_BASE_URL}/api/simulation/ws`)
 
     ws.onopen = () => {
       setIsConnected(true)

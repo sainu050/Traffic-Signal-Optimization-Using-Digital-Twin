@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { API_BASE_URL } from './config'
 import SimulationCanvas from './SimulationCanvas'
 import {
   Sliders, Route, Users, Activity, FileText, 
@@ -59,7 +60,7 @@ export default function OperatorDashboard({
   // Load active operational database resources on mount
   const fetchData = async () => {
     try {
-      const resInt = await fetch('http://localhost:8000/api/intersections')
+      const resInt = await fetch(`${API_BASE_URL}/api/intersections`)
       if (resInt.ok) {
         const dataInt = await resInt.json()
         setLocalIntersections(dataInt)
@@ -69,13 +70,13 @@ export default function OperatorDashboard({
         }
       }
       
-      const resOp = await fetch('http://localhost:8000/api/operators')
+      const resOp = await fetch(`${API_BASE_URL}/api/operators`)
       if (resOp.ok) {
         const dataOp = await resOp.json()
         setOperators(dataOp)
       }
 
-      const resInc = await fetch('http://localhost:8000/api/incidents')
+      const resInc = await fetch(`${API_BASE_URL}/api/incidents`)
       if (resInc.ok) {
         const dataInc = await resInc.json()
         setIncidents(dataInc)
@@ -92,7 +93,7 @@ export default function OperatorDashboard({
         isInitialFetchRef.current = false
       }
 
-      const resLogs = await fetch('http://localhost:8000/api/logs')
+      const resLogs = await fetch(`${API_BASE_URL}/api/logs`)
       if (resLogs.ok) {
         const dataLogs = await resLogs.json()
         setAuditLogs(dataLogs.map(l => ({
@@ -104,7 +105,7 @@ export default function OperatorDashboard({
       }
 
       try {
-        const resMO = await fetch('http://localhost:8000/api/manual-overrides')
+        const resMO = await fetch(`${API_BASE_URL}/api/manual-overrides`)
         if (resMO.ok) {
           const dataMO = await resMO.json()
           setManualOverridesList(dataMO.overrides || [])
@@ -149,7 +150,7 @@ export default function OperatorDashboard({
     const newEntry = { time, user, action, target }
     setAuditLogs(prev => [newEntry, ...prev])
     
-    fetch('http://localhost:8000/api/logs', {
+    fetch(`${API_BASE_URL}/api/logs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -163,7 +164,7 @@ export default function OperatorDashboard({
   // Monitor operations Control API
   const controlMonitor = async (action) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/simulation/${action}`, { method: 'POST' })
+      const res = await fetch(`${API_BASE_URL}/api/simulation/${action}`, { method: 'POST' })
       const data = await res.json()
       if (res.ok && data.success) {
         addToast(`Traffic simulator ${action} command sent successfully.`, 'success')
@@ -187,7 +188,7 @@ export default function OperatorDashboard({
     try {
       const targetId = parseInt(overrideTargetId)
       const targetInt = localIntersections.find(i => i.id === targetId)
-      const res = await fetch(`http://localhost:8000/api/intersections/${targetId}/override`, {
+      const res = await fetch(`${API_BASE_URL}/api/intersections/${targetId}/override`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -214,7 +215,7 @@ export default function OperatorDashboard({
   const handleReleaseOverride = async (intId) => {
     try {
       const targetInt = localIntersections.find(i => i.id === intId)
-      const res = await fetch(`http://localhost:8000/api/intersections/${intId}/release`, {
+      const res = await fetch(`${API_BASE_URL}/api/intersections/${intId}/release`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' }
       })
@@ -240,7 +241,7 @@ export default function OperatorDashboard({
     }
     
     try {
-      const res = await fetch(`http://localhost:8000/api/users/${userId}/profile`, {
+      const res = await fetch(`${API_BASE_URL}/api/users/${userId}/profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -275,7 +276,7 @@ export default function OperatorDashboard({
 
     setIsUpdatingDuty(true)
     try {
-      const res = await fetch(`http://localhost:8000/api/operators/${userId}/duty-status`, {
+      const res = await fetch(`${API_BASE_URL}/api/operators/${userId}/duty-status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_online: nextStatus })
@@ -310,7 +311,7 @@ export default function OperatorDashboard({
   // Verify and resolve reported incidents
   const handleVerifyIncident = async (incidentId, newStatus) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/incidents/${incidentId}/status`, {
+      const res = await fetch(`${API_BASE_URL}/api/incidents/${incidentId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus, verified_by: currentUser?.name || 'Traffic Operator' })
@@ -331,7 +332,7 @@ export default function OperatorDashboard({
     addToast('Generating comprehensive visual traffic analysis report...', 'info')
     
     // Call backend API to log report generation
-    fetch('http://localhost:8000/api/reports', {
+    fetch(`${API_BASE_URL}/api/reports`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

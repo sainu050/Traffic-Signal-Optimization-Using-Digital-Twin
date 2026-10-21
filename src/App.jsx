@@ -16,6 +16,7 @@ import LandingPage from './LandingPage';
 import AdminDashboard from './AdminDashboard';
 import OperatorDashboard from './OperatorDashboard';
 import SimulationCanvas from './SimulationCanvas';
+import { API_BASE_URL } from './config';
 
 // ══════════════════════════════════════════
 // INCIDENT REPORTING DEFINITIONS & DROPDOWN
@@ -382,7 +383,7 @@ export default function App() {
 
   const fetchPublicIncidents = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/incidents');
+      const res = await fetch(`${API_BASE_URL}/api/incidents`);
       if (res.ok) {
         const data = await res.json();
         setPublicIncidents(data);
@@ -402,7 +403,7 @@ export default function App() {
 
   const fetchKottayamWeather = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/weather/kottayam');
+      const res = await fetch(`${API_BASE_URL}/api/weather/kottayam`);
       if (res.ok) {
         const data = await res.json();
         setKottayamWeather(data);
@@ -434,7 +435,7 @@ export default function App() {
 
   const fetchPublicNotifications = async () => {
     try {
-      const res = await fetch(`http://localhost:8000/api/public/notifications?user_name=${encodeURIComponent(currentUser?.name || '')}`);
+      const res = await fetch(`${API_BASE_URL}/api/public/notifications?user_name=${encodeURIComponent(currentUser?.name || '')}`);
       if (res.ok) {
         const data = await res.json();
         setPublicNotifications(data.notifications || []);
@@ -496,7 +497,7 @@ export default function App() {
     setIsSavingProfile(true);
     try {
       const identifier = currentUser?.id ? String(currentUser.id) : (currentUser?.email || '1');
-      const res = await fetch(`http://localhost:8000/api/users/${encodeURIComponent(identifier)}/profile`, {
+      const res = await fetch(`${API_BASE_URL}/api/users/${encodeURIComponent(identifier)}/profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -549,7 +550,7 @@ export default function App() {
     }
     setIsUpdatingPassword(true);
     try {
-      const res = await fetch('http://localhost:8000/api/users/change-password', {
+      const res = await fetch(`${API_BASE_URL}/api/users/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -698,7 +699,7 @@ export default function App() {
     addToast('Authenticating...', 'info');
 
     try {
-      const response = await fetch('http://localhost:8000/api/login', {
+      const response = await fetch(`${API_BASE_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: loginEmail, password: loginPassword }),
@@ -778,7 +779,7 @@ export default function App() {
 
     setFirstLoginLoading(true);
 
-    fetch('http://localhost:8000/api/users/change-password', {
+    fetch(`${API_BASE_URL}/api/users/change-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -820,7 +821,7 @@ export default function App() {
     }
     addToast('Looking up account...', 'info');
     try {
-      const res = await fetch('http://localhost:8000/api/forgot-password/question', {
+      const res = await fetch(`${API_BASE_URL}/api/forgot-password/question`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: forgotEmail })
@@ -842,7 +843,7 @@ export default function App() {
     e.preventDefault();
     addToast('Verifying answer...', 'info');
     try {
-      const res = await fetch('http://localhost:8000/api/forgot-password/verify', {
+      const res = await fetch(`${API_BASE_URL}/api/forgot-password/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: forgotEmail, answer: forgotSecurityAnswer })
@@ -871,7 +872,7 @@ export default function App() {
     }
     addToast('Resetting password...', 'info');
     try {
-      const res = await fetch('http://localhost:8000/api/forgot-password/reset', {
+      const res = await fetch(`${API_BASE_URL}/api/forgot-password/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -947,7 +948,7 @@ export default function App() {
 
     setIsSubmittingIncident(true);
     try {
-      const res = await fetch('http://localhost:8000/api/incidents', {
+      const res = await fetch(`${API_BASE_URL}/api/incidents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1018,7 +1019,7 @@ export default function App() {
     addToast('Creating your account...', 'info');
 
     try {
-      const response = await fetch('http://localhost:8000/api/register', {
+      const response = await fetch(`${API_BASE_URL}/api/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
