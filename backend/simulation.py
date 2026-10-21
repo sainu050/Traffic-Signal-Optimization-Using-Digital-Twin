@@ -30,15 +30,24 @@ class TrafficSimulation:
         self.start_sumo()
 
     def start_sumo(self):
-        sumo_binary = os.path.join(os.environ["SUMO_HOME"], "bin", "sumo")
+        sumo_binary = os.path.join(os.environ.get("SUMO_HOME", ""), "bin", "sumo")
         if os.name == 'nt':
             sumo_binary += ".exe"
+        elif not os.path.exists(sumo_binary):
+            if os.path.exists("/usr/bin/sumo"):
+                sumo_binary = "/usr/bin/sumo"
+            else:
+                sumo_binary = "sumo"
             
         sumo_cfg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sumo_files", "sumo.sumocfg")
         
         # Kill any orphaned SUMO processes to free up port 8813
         if os.name == 'nt':
             os.system("taskkill /f /im sumo.exe >nul 2>&1")
+            import time
+            time.sleep(0.5)
+        else:
+            os.system("pkill -9 -f sumo >/dev/null 2>&1")
             import time
             time.sleep(0.5)
             
