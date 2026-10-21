@@ -4,6 +4,7 @@ FROM python:3.11-slim
 # Prevent interactive prompts and configure environment
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONMALLOC=malloc
 ENV SUMO_HOME=/usr/share/sumo
 
 # Install SUMO, SUMO tools, PostgreSQL client runtime, and procps (for pkill)
@@ -30,5 +31,5 @@ WORKDIR /app/backend
 # Default port exposure
 EXPOSE 8000
 
-# Start Uvicorn bound to 0.0.0.0 using Render's PORT environment variable (fallback 8000)
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Start Uvicorn bound to 0.0.0.0 using Render's PORT environment variable (fallback 8000) with 1 worker
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]

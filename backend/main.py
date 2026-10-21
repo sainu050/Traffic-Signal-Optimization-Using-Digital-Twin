@@ -128,6 +128,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+@app.head("/")
+def health_check():
+    return {"status": "ok", "service": "UrbanFlow Backend", "version": "1.0.0"}
+
 # Pydantic validation models
 class UserRegisterSchema(BaseModel):
     name: str
