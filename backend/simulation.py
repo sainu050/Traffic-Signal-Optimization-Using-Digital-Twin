@@ -60,7 +60,7 @@ class TrafficSimulation:
             "--no-warnings", 
             "--no-step-log",
             "--step-length", "0.08"
-        ], port=8813)
+        ], numRetries=20)
         self.sumo_started = True
 
     def reload(self):

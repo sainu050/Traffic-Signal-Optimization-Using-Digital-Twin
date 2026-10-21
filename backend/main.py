@@ -1495,31 +1495,34 @@ def run_simulation_thread():
     current_phase = "north_green"
     timer_remaining = 12
     step_counter = 0
+    signals = {"north": "green", "east": "red", "south": "red", "west": "red"}
+    state_string = "GGGGrrrrrrrrrrrr"
     
     while True:
         time.sleep(0.04) # 25 FPS (every 40ms)
-        db = SessionLocal()
-        try:
-            # Read traffic light state from PostgreSQL dynamically
-            active_id = get_active_intersection_id(db)
-            sig = db.query(TrafficSignal).filter(TrafficSignal.intersection_id == active_id).order_by(TrafficSignal.signal_id.desc()).first()
-            
-            if sig:
-                if sig.mode == "MANUAL":
-                    state = sig.current_state
-                    if state in ["north_green", "east_green", "south_green", "west_green"]:
-                        current_phase = state
-                    elif state == "green":
-                        current_phase = "north_green"
-                    elif state == "red":
-                        current_phase = "south_green"
-                    else:
-                        current_phase = "north_green"
-                    
-                    # Decrement manual countdown every 25 steps (1s at 25 FPS)
-                    step_counter += 1
-                    if step_counter >= 25:
-                        step_counter = 0
+        step_counter += 1
+        
+        # Only poll and sync with PostgreSQL once every 25 steps (1 second) to conserve connections and RAM
+        if step_counter >= 25:
+            step_counter = 0
+            db = SessionLocal()
+            try:
+                # Read traffic light state from PostgreSQL dynamically
+                active_id = get_active_intersection_id(db)
+                sig = db.query(TrafficSignal).filter(TrafficSignal.intersection_id == active_id).order_by(TrafficSignal.signal_id.desc()).first()
+                
+                if sig:
+                    if sig.mode == "MANUAL":
+                        state = sig.current_state
+                        if state in ["north_green", "east_green", "south_green", "west_green"]:
+                            current_phase = state
+                        elif state == "green":
+                            current_phase = "north_green"
+                        elif state == "red":
+                            current_phase = "south_green"
+                        else:
+                            current_phase = "north_green"
+                        
                         if sig.green_time and sig.green_time > 0:
                             sig.green_time -= 1
                             db.commit()
@@ -1540,22 +1543,18 @@ def run_simulation_thread():
                             db.commit()
                             current_phase = "north_green"
                             timer_remaining = 12
-                    
-                    wait_time = sig.green_time or 0
-                    if current_phase == "north_green":
-                        signals = {"north": "green", "east": "red", "south": "red", "west": "red"}
-                        sim.signal_timers = {"north": wait_time, "east": 0, "south": 0, "west": 0}
-                        state_string = "GGGGrrrrrrrrrrrr"
+                        
+                        wait_time = sig.green_time or 0
+                        if current_phase == "north_green":
+                            signals = {"north": "green", "east": "red", "south": "red", "west": "red"}
+                            sim.signal_timers = {"north": wait_time, "east": 0, "south": 0, "west": 0}
+                            state_string = "GGGGrrrrrrrrrrrr"
+                        else:
+                            signals = {"north": "red", "east": "red", "south": "green", "west": "red"}
+                            sim.signal_timers = {"north": 0, "east": 0, "south": wait_time, "west": 0}
+                            state_string = "rrrrrrrrGGGGrrrr"
                     else:
-                        signals = {"north": "red", "east": "red", "south": "green", "west": "red"}
-                        sim.signal_timers = {"north": 0, "east": 0, "south": wait_time, "west": 0}
-                        state_string = "rrrrrrrrGGGGrrrr"
-                else:
-                    # --- AUTO MODE (RULE-BASED ADAPTIVE TRAFFIC CONTROL) ---
-                    # Decrement AUTO countdown every 25 steps (1s at 25 FPS)
-                    step_counter += 1
-                    if step_counter >= 25:
-                        step_counter = 0
+                        # --- AUTO MODE (RULE-BASED ADAPTIVE TRAFFIC CONTROL) ---
                         timer_remaining -= 1
                         
                         if timer_remaining <= 0:
@@ -1565,13 +1564,10 @@ def run_simulation_thread():
                                 timer_remaining = 3
                             elif current_phase == "north_yellow":
                                 current_phase = "east_green"
-                                
-                                # ADAPTIVE RULE: Adjust East green duration based on East queue lengths
                                 try:
                                     q = traci.lane.getLastStepHaltingNumber("E2C_0")
                                 except Exception:
                                     q = 0
-                                    
                                 base_duration = 12
                                 if q > 3:
                                     timer_remaining = min(base_duration + (q - 3) * 2, 25)
@@ -1585,19 +1581,15 @@ def run_simulation_thread():
                                     db.commit()
                                 else:
                                     timer_remaining = base_duration
-                                    
                             elif current_phase == "east_green":
                                 current_phase = "east_yellow"
                                 timer_remaining = 3
                             elif current_phase == "east_yellow":
                                 current_phase = "south_green"
-                                
-                                # ADAPTIVE RULE: Adjust South green duration based on South queue lengths
                                 try:
                                     q = traci.lane.getLastStepHaltingNumber("S2C_0")
                                 except Exception:
                                     q = 0
-                                    
                                 base_duration = 12
                                 if q > 3:
                                     timer_remaining = min(base_duration + (q - 3) * 2, 25)
@@ -1611,19 +1603,15 @@ def run_simulation_thread():
                                     db.commit()
                                 else:
                                     timer_remaining = base_duration
-                                    
                             elif current_phase == "south_green":
                                 current_phase = "south_yellow"
                                 timer_remaining = 3
                             elif current_phase == "south_yellow":
                                 current_phase = "west_green"
-                                
-                                # ADAPTIVE RULE: Adjust West green duration based on West queue lengths
                                 try:
                                     q = traci.lane.getLastStepHaltingNumber("W2C_0")
                                 except Exception:
                                     q = 0
-                                    
                                 base_duration = 12
                                 if q > 3:
                                     timer_remaining = min(base_duration + (q - 3) * 2, 25)
@@ -1637,19 +1625,15 @@ def run_simulation_thread():
                                     db.commit()
                                 else:
                                     timer_remaining = base_duration
-                                    
                             elif current_phase == "west_green":
                                 current_phase = "west_yellow"
                                 timer_remaining = 3
                             elif current_phase == "west_yellow":
                                 current_phase = "north_green"
-                                
-                                # ADAPTIVE RULE: Adjust North green duration based on North queue lengths
                                 try:
                                     q = traci.lane.getLastStepHaltingNumber("N2C_0")
                                 except Exception:
                                     q = 0
-                                    
                                 base_duration = 12
                                 if q > 3:
                                     timer_remaining = min(base_duration + (q - 3) * 2, 25)
@@ -1667,95 +1651,54 @@ def run_simulation_thread():
                             sig.current_state = current_phase
                             sig.green_time = timer_remaining
                             db.commit()
-                            
-                    # Update real-time countdown values for WebSocket clients
-                    T = timer_remaining
-                    if current_phase == "north_green":
-                        signals = {"north": "green", "east": "red", "south": "red", "west": "red"}
-                        sim.signal_timers = {
-                            "north": T,
-                            "east": T + 3,
-                            "south": T + 18,
-                            "west": T + 33
-                        }
-                        state_string = "GGGGrrrrrrrrrrrr"
-                    elif current_phase == "north_yellow":
-                        signals = {"north": "yellow", "east": "red", "south": "red", "west": "red"}
-                        sim.signal_timers = {
-                            "north": T,
-                            "east": T,
-                            "south": T + 15,
-                            "west": T + 30
-                        }
-                        state_string = "yyyyrrrrrrrrrrrr"
-                    elif current_phase == "east_green":
-                        signals = {"north": "red", "east": "green", "south": "red", "west": "red"}
-                        sim.signal_timers = {
-                            "north": T + 33,
-                            "east": T,
-                            "south": T + 3,
-                            "west": T + 18
-                        }
-                        state_string = "rrrrGGGGrrrrrrrr"
-                    elif current_phase == "east_yellow":
-                        signals = {"north": "red", "east": "yellow", "south": "red", "west": "red"}
-                        sim.signal_timers = {
-                            "north": T + 30,
-                            "east": T,
-                            "south": T,
-                            "west": T + 15
-                        }
-                        state_string = "rrrryyyyrrrrrrrr"
-                    elif current_phase == "south_green":
-                        signals = {"north": "red", "east": "red", "south": "green", "west": "red"}
-                        sim.signal_timers = {
-                            "north": T + 18,
-                            "east": T + 33,
-                            "south": T,
-                            "west": T + 3
-                        }
-                        state_string = "rrrrrrrrGGGGrrrr"
-                    elif current_phase == "south_yellow":
-                        signals = {"north": "red", "east": "red", "south": "yellow", "west": "red"}
-                        sim.signal_timers = {
-                            "north": T + 15,
-                            "east": T + 30,
-                            "south": T,
-                            "west": T
-                        }
-                        state_string = "rrrrrrrryyyyrrrr"
-                    elif current_phase == "west_green":
-                        signals = {"north": "red", "east": "red", "south": "red", "west": "green"}
-                        sim.signal_timers = {
-                            "north": T + 3,
-                            "east": T + 18,
-                            "south": T + 33,
-                            "west": T
-                        }
-                        state_string = "rrrrrrrrrrrrGGGG"
-                    elif current_phase == "west_yellow":
-                        signals = {"north": "red", "east": "red", "south": "red", "west": "yellow"}
-                        sim.signal_timers = {
-                            "north": T,
-                            "east": T + 15,
-                            "south": T + 30,
-                            "west": T
-                        }
-                        state_string = "rrrrrrrrrrrryyyy"
-                    else:
-                        signals = {"north": "red", "east": "red", "south": "red", "west": "red"}
-                        sim.signal_timers = {"north": 0, "east": 0, "south": 0, "west": 0}
-                        state_string = "rrrrrrrrrrrrrrrr"
-            else:
-                signals = {"north": "green", "east": "red", "south": "red", "west": "red"}
-                sim.signal_timers = {"north": 12, "east": 15, "south": 30, "west": 45}
-                state_string = "GGGGrrrrrrrrrrrr"
-            
-            sim.update_signals(signals, state_string)
-        except Exception:
-            pass
-        finally:
-            db.close()
+                        
+                        T = timer_remaining
+                        if current_phase == "north_green":
+                            signals = {"north": "green", "east": "red", "south": "red", "west": "red"}
+                            sim.signal_timers = {"north": T, "east": T + 3, "south": T + 18, "west": T + 33}
+                            state_string = "GGGGrrrrrrrrrrrr"
+                        elif current_phase == "north_yellow":
+                            signals = {"north": "yellow", "east": "red", "south": "red", "west": "red"}
+                            sim.signal_timers = {"north": T, "east": T, "south": T + 15, "west": T + 30}
+                            state_string = "yyyyrrrrrrrrrrrr"
+                        elif current_phase == "east_green":
+                            signals = {"north": "red", "east": "green", "south": "red", "west": "red"}
+                            sim.signal_timers = {"north": T + 33, "east": T, "south": T + 3, "west": T + 18}
+                            state_string = "rrrrGGGGrrrrrrrr"
+                        elif current_phase == "east_yellow":
+                            signals = {"north": "red", "east": "yellow", "south": "red", "west": "red"}
+                            sim.signal_timers = {"north": T + 30, "east": T, "south": T, "west": T + 15}
+                            state_string = "rrrryyyyrrrrrrrr"
+                        elif current_phase == "south_green":
+                            signals = {"north": "red", "east": "red", "south": "green", "west": "red"}
+                            sim.signal_timers = {"north": T + 18, "east": T + 33, "south": T, "west": T + 3}
+                            state_string = "rrrrrrrrGGGGrrrr"
+                        elif current_phase == "south_yellow":
+                            signals = {"north": "red", "east": "red", "south": "yellow", "west": "red"}
+                            sim.signal_timers = {"north": T + 15, "east": T + 30, "south": T, "west": T}
+                            state_string = "rrrrrrrryyyyrrrr"
+                        elif current_phase == "west_green":
+                            signals = {"north": "red", "east": "red", "south": "red", "west": "green"}
+                            sim.signal_timers = {"north": T + 3, "east": T + 18, "south": T + 33, "west": T}
+                            state_string = "rrrrrrrrrrrrGGGG"
+                        elif current_phase == "west_yellow":
+                            signals = {"north": "red", "east": "red", "south": "red", "west": "yellow"}
+                            sim.signal_timers = {"north": T, "east": T + 15, "south": T + 30, "west": T}
+                            state_string = "rrrrrrrrrrrryyyy"
+                        else:
+                            signals = {"north": "red", "east": "red", "south": "red", "west": "red"}
+                            sim.signal_timers = {"north": 0, "east": 0, "south": 0, "west": 0}
+                            state_string = "rrrrrrrrrrrrrrrr"
+                else:
+                    signals = {"north": "green", "east": "red", "south": "red", "west": "red"}
+                    sim.signal_timers = {"north": 12, "east": 15, "south": 30, "west": 45}
+                    state_string = "GGGGrrrrrrrrrrrr"
+                
+                sim.update_signals(signals, state_string)
+            except Exception:
+                pass
+            finally:
+                db.close()
             
         sim.step()
         if main_loop is not None:
