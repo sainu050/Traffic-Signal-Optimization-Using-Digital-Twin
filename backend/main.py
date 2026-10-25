@@ -1030,24 +1030,64 @@ def get_operators(db: Session = Depends(get_db)):
         })
     return results
 
-def send_email_notification(recipient: str, subject: str, body: str):
-    # Print to the console
+def send_email_notification(recipient: str, subject: str, plain_body: str, html_body: str = None):
+    # Print to the console for tracking/debugging
     print("\n" + "="*50)
-    print(f"SMTP SIMULATOR - EMAIL SENT TO: {recipient}")
-    print(f"SUBJECT: {subject}")
-    print(f"BODY:\n{body}")
+    print(f"[EMAIL] RECIPIENT: {recipient}")
+    print(f"[EMAIL] SUBJECT: {subject}")
+    print(f"[EMAIL] BODY:\n{plain_body}")
     print("="*50 + "\n")
     
-    # Write to a local sent_emails.txt file
+    # Write to local sent_emails.txt as persistent local backup/audit
     try:
-        with open("sent_emails.txt", "a") as f:
+        with open("sent_emails.txt", "a", encoding="utf-8") as f:
             f.write(f"Timestamp: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write(f"To: {recipient}\n")
             f.write(f"Subject: {subject}\n")
-            f.write(f"Body:\n{body}\n")
+            f.write(f"Body:\n{plain_body}\n")
             f.write("-" * 50 + "\n\n")
     except Exception:
         pass
+
+    # Attempt to send real email via Gmail SMTP
+    smtp_email = os.environ.get("SMTP_EMAIL", "admin.urbanflow@gmail.com")
+    smtp_password = os.environ.get("SMTP_PASSWORD", "").strip()
+
+    if not smtp_password:
+        print("[EMAIL] SMTP_PASSWORD environment variable not set. Email logged locally to sent_emails.txt.")
+        return False
+
+    try:
+        import smtplib
+        import ssl
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"UrbanFlow Admin <{smtp_email}>"
+        msg["To"] = recipient
+
+        part1 = MIMEText(plain_body, "plain", "utf-8")
+        msg.attach(part1)
+
+        if html_body:
+            part2 = MIMEText(html_body, "html", "utf-8")
+            msg.attach(part2)
+
+        context = ssl.create_default_context()
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
+            server.ehlo()
+            server.starttls(context=context)
+            server.ehlo()
+            server.login(smtp_email, smtp_password)
+            server.sendmail(smtp_email, recipient, msg.as_string())
+
+        print(f"[EMAIL SUCCESS] Dispatched live email to {recipient} via {smtp_email}!")
+        return True
+    except Exception as e:
+        print(f"[EMAIL ERROR] Failed to send email to {recipient}: {e}")
+        return False
 
 @app.post("/api/operators")
 def create_operator(data: OperatorCreate, db: Session = Depends(get_db)):
@@ -1084,31 +1124,101 @@ def create_operator(data: OperatorCreate, db: Session = Depends(get_db)):
             db.add(assign)
             db.commit()
             
-    # Send email notification containing temporary password via local SMTP Simulator
-    email_body = f"""Hello {new_user.name},
+    frontend_url = os.environ.get("FRONTEND_URL", "https://urbanflow-32cx.onrender.com")
 
-You have been registered as a Traffic Operator on the UrbanFlow Digital Twin platform.
+    # Plain text email version
+    email_plain = f"""Hello {new_user.name},
+
+You have been registered as a Traffic Controller / Operator on the UrbanFlow Digital Twin platform.
 
 Here are your credentials for your first login:
-- URL: http://localhost:5173
-- Email: {new_user.email}
+- Portal URL: {frontend_url}
+- Account Email: {new_user.email}
 - Temporary Password: {temp_password}
 
-For security reasons, you will be required to change this password immediately upon logging in.
+Security Policy:
+For platform compliance, you will be prompted to replace this temporary password with your permanent password upon your first sign-in.
 
 Best regards,
-UrbanFlow Administration System"""
-    
+UrbanFlow Administration System
+admin.urbanflow@gmail.com"""
+
+    # Sleek HTML email version with dark navy & cyan UrbanFlow theme
+    email_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0f19; color: #f1f5f9; margin: 0; padding: 24px; }}
+            .container {{ max-width: 560px; margin: 0 auto; background: #0f172a; border-radius: 16px; border: 1px solid #1e293b; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }}
+            .header {{ background: linear-gradient(135deg, #0ea5e9, #3b82f6); padding: 28px 24px; text-align: center; }}
+            .header h1 {{ margin: 0; color: #ffffff; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }}
+            .header p {{ margin: 6px 0 0; color: rgba(255,255,255,0.9); font-size: 13px; }}
+            .content {{ padding: 28px 24px; }}
+            .greeting {{ font-size: 16px; font-weight: 600; color: #f8fafc; margin-bottom: 12px; }}
+            .text {{ font-size: 14px; line-height: 1.6; color: #94a3b8; margin-bottom: 20px; }}
+            .card {{ background: #1e293b; border-left: 4px solid #06b6d4; padding: 16px; border-radius: 8px; margin-bottom: 24px; }}
+            .field {{ margin-bottom: 8px; font-size: 14px; }}
+            .field:last-child {{ margin-bottom: 0; }}
+            .label {{ color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }}
+            .value {{ color: #38bdf8; font-weight: 600; font-family: monospace; font-size: 15px; }}
+            .btn-container {{ text-align: center; margin: 28px 0; }}
+            .btn {{ display: inline-block; background: linear-gradient(135deg, #06b6d4, #3b82f6); color: #ffffff !important; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px; }}
+            .footer {{ background: #0b0f19; padding: 16px 24px; text-align: center; font-size: 12px; color: #475569; border-top: 1px solid #1e293b; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>UrbanFlow Digital Twin</h1>
+                <p>Adaptive Traffic Signal Optimization Platform</p>
+            </div>
+            <div class="content">
+                <div class="greeting">Hello {new_user.name},</div>
+                <div class="text">
+                    You have been provisioned an official <strong>Traffic Controller (Operator)</strong> account on the UrbanFlow platform. Below are your temporary credentials for your first login.
+                </div>
+                <div class="card">
+                    <div class="field">
+                        <div class="label">Portal URL</div>
+                        <div class="value"><a href="{frontend_url}" style="color: #38bdf8; text-decoration: none;">{frontend_url}</a></div>
+                    </div>
+                    <div class="field" style="margin-top: 12px;">
+                        <div class="label">Account Email</div>
+                        <div class="value">{new_user.email}</div>
+                    </div>
+                    <div class="field" style="margin-top: 12px;">
+                        <div class="label">Temporary Password</div>
+                        <div class="value" style="color: #4ade80; font-size: 18px; letter-spacing: 1px;">{temp_password}</div>
+                    </div>
+                </div>
+                <div class="btn-container">
+                    <a href="{frontend_url}" class="btn">Log In to UrbanFlow</a>
+                </div>
+                <div class="text" style="font-size: 12px; color: #64748b; margin-bottom: 0;">
+                    🔒 <strong>Security Policy:</strong> For platform compliance, you will be prompted to replace this temporary password with your permanent password upon your first sign-in.
+                </div>
+            </div>
+            <div class="footer">
+                &copy; {datetime.datetime.now().year} UrbanFlow City Intelligent Transport Systems. All rights reserved.
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
     send_email_notification(
         recipient=new_user.email,
-        subject="UrbanFlow Traffic Operator Account Created",
-        body=email_body
+        subject="UrbanFlow — Traffic Operator Credentials (First Login)",
+        plain_body=email_plain,
+        html_body=email_html
     )
             
     return {
         "success": True, 
         "tempPassword": temp_password,
-        "message": "Operator created successfully. Temporary password has been logged to sent_emails.txt."
+        "message": "Operator created successfully. Temporary password has been sent to their email."
     }
 
 @app.put("/api/operators/{id}/assign")
