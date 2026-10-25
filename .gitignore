@@ -30,6 +30,7 @@ __pycache__/
 *.pyd
 
 # Local SMTP Simulator files
+sent_emails.txt
 backend/sent_emails.txt
 
 # Local environments / API credentials

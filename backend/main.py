@@ -1051,7 +1051,7 @@ def send_email_notification(recipient: str, subject: str, plain_body: str, html_
 
     # Attempt to send real email via Gmail SMTP
     smtp_email = os.environ.get("SMTP_EMAIL", "admin.urbanflow@gmail.com")
-    smtp_password = os.environ.get("SMTP_PASSWORD", "").strip()
+    smtp_password = os.environ.get("SMTP_PASSWORD", "ipbjuwtkderkenlw").replace(" ", "").strip()
 
     if not smtp_password:
         print("[EMAIL] SMTP_PASSWORD environment variable not set. Email logged locally to sent_emails.txt.")
