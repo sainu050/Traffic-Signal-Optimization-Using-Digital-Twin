@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import UrbanFlowLogo from './UrbanFlowLogo'
 
 /* ═══════════════════════════════════════════════════════════════════
    Hooks
@@ -88,16 +89,10 @@ function Navbar({ onNavigate }) {
       transition: 'all 0.35s ease',
     }}>
       {/* Logo */}
-      <div 
-        className="logo" 
+      <UrbanFlowLogo 
         onClick={(e) => smoothScroll(e, 'platform')} 
-        style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
-      >
-        <div className="logo-icon">
-          <i className="fas fa-traffic-light"></i>
-        </div>
-        <span className="logo-text" style={{ color: 'white' }}>Urban<span style={{ color: '#06b6d4' }}>Flow</span></span>
-      </div>
+        style={{ cursor: 'pointer' }}
+      />
 
       {/* Links */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '2.5rem' }}>
@@ -903,10 +898,7 @@ function Footer({ onNavigate, onRoleLogin }) {
           {/* Brand */}
           <div style={{ maxWidth: 280 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              <div className="logo">
-                <div className="logo-icon"><i className="fas fa-traffic-light"></i></div>
-                <span className="logo-text" style={{ color: 'white' }}>Urban<span style={{ color: '#06b6d4' }}>Flow</span></span>
-              </div>
+              <UrbanFlowLogo />
             </div>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.38)', lineHeight: 1.65, margin: 0 }}>
               Smart traffic management for smarter cities. Powered by simulation, driven by data.

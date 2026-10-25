@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 120" width="100%" height="100%">
+  <defs>
+    <!-- Cyan to Blue Gradient -->
+    <linearGradient id="flowCyanBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+
+    <!-- Emerald to Cyan Gradient -->
+    <linearGradient id="flowGreenCyan" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+
+    <!-- Neon Glow Filter -->
+    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- ICON EMBLEM (Centered on Left, X: 20 to 110) -->
+  <g transform="translate(15, 12)">
+    <!-- Outer Shield / Network Ring -->
+    <circle cx="48" cy="48" r="44" fill="#0f172a" stroke="#1e293b" stroke-width="2" />
+    
+    <!-- Flow Path 1: Downward Loop (West to South Stream) -->
+    <path d="M 28 24 C 28 52, 44 68, 68 68 C 76 68, 80 64, 80 56 C 80 44, 64 36, 48 36 C 36 36, 28 44, 28 56 C 28 72, 44 80, 68 80"
+          fill="none" 
+          stroke="url(#flowCyanBlue)" 
+          stroke-width="6.5" 
+          stroke-linecap="round" 
+          filter="url(#neonGlow)" />
+
+    <!-- Flow Path 2: Converging Adaptive Stream (North to East) -->
+    <path d="M 48 18 C 48 38, 62 48, 78 48" 
+          fill="none" 
+          stroke="url(#flowGreenCyan)" 
+          stroke-width="5.5" 
+          stroke-linecap="round" />
+
+    <!-- Traffic Signal Pulse Nodes -->
+    <circle cx="28" cy="24" r="4.5" fill="#10b981" filter="url(#neonGlow)" />
+    <circle cx="48" cy="18" r="4" fill="#06b6d4" filter="url(#neonGlow)" />
+    <circle cx="68" cy="80" r="4.5" fill="#3b82f6" filter="url(#neonGlow)" />
+    <circle cx="78" cy="48" r="3.5" fill="#f59e0b" filter="url(#neonGlow)" />
+  </g>
+
+  <!-- TYPOGRAPHY BRANDING -->
+  <g transform="translate(135, 68)">
+    <!-- "URBAN" Text in Clean Crisp White -->
+    <text font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+          font-size="42" 
+          font-weight="800" 
+          letter-spacing="2" 
+          fill="#f8fafc">URBAN</text>
+
+    <!-- "FLOW" Text in Glowing Cyan Gradient -->
+    <text x="178" 
+          font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+          font-size="42" 
+          font-weight="800" 
+          letter-spacing="2" 
+          fill="url(#flowCyanBlue)" 
+          filter="url(#neonGlow)">FLOW</text>
+
+    <!-- Subtitle: Digital Twin Intelligence -->
+    <text y="24" 
+          font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+          font-size="11" 
+          font-weight="600" 
+          letter-spacing="3.5" 
+          fill="#64748b">DIGITAL TWIN TRAFFIC INTELLIGENCE</text>
+  </g>
+</svg>

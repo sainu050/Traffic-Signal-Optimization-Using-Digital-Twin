@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { API_BASE_URL } from './config'
 import SimulationCanvas from './SimulationCanvas'
+import UrbanFlowLogo from './UrbanFlowLogo'
 import {
   Sliders, Route, Users, Activity, FileText, 
   Settings, Power, Bell, Shield, UserCheck, Info,
@@ -584,10 +585,7 @@ export default function OperatorDashboard({
       }}>
         {/* Brand Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 38 }}>
-          <div className="logo">
-            <div className="logo-icon"><i className="fas fa-traffic-light"></i></div>
-            <span className="logo-text" style={{ color: 'white' }}>Urban<span style={{ color: '#06b6d4' }}>Flow</span></span>
-          </div>
+          <UrbanFlowLogo />
         </div>
 
         {/* Navigation Menu */}

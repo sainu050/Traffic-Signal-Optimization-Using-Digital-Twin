@@ -16,6 +16,7 @@ import LandingPage from './LandingPage';
 import AdminDashboard from './AdminDashboard';
 import OperatorDashboard from './OperatorDashboard';
 import SimulationCanvas from './SimulationCanvas';
+import UrbanFlowLogo from './UrbanFlowLogo';
 import { API_BASE_URL } from './config';
 
 // ══════════════════════════════════════════
@@ -1088,10 +1089,7 @@ export default function App() {
           <div className="auth-visual">
             <div className="auth-visual-inner">
               <div className="auth-visual-logo">
-                <div className="logo" onClick={() => setCurrentPage('landing')}>
-                  <div className="logo-icon"><i className="fas fa-traffic-light"></i></div>
-                  <span className="logo-text">Urban<span>Flow</span></span>
-                </div>
+                <UrbanFlowLogo onClick={() => setCurrentPage('landing')} />
               </div>
               <h2 className="auth-visual-title">Traffic Control<br/>at Your Fingertips</h2>
               <p className="auth-visual-desc">
@@ -1121,10 +1119,7 @@ export default function App() {
           {/* Right form panel */}
           <div className="auth-form-panel">
             <div className="auth-form-scroll">
-              <div className="logo" onClick={() => setCurrentPage('landing')} style={{ marginBottom: '32px' }}>
-                <div className="logo-icon"><i className="fas fa-traffic-light"></i></div>
-                <span className="logo-text">Urban<span>Flow</span></span>
-              </div>
+              <UrbanFlowLogo onClick={() => setCurrentPage('landing')} style={{ marginBottom: '32px' }} />
 
               <div className="auth-form-header">
                 <h1 className="auth-form-title">Welcome Back</h1>
@@ -1246,10 +1241,7 @@ export default function App() {
           <div className="auth-visual">
             <div className="auth-visual-inner">
               <div className="auth-visual-logo">
-                <div className="logo" onClick={() => { setCurrentPage('landing'); setForgotStep(1); }}>
-                  <div className="logo-icon"><i className="fas fa-traffic-light"></i></div>
-                  <span className="logo-text">Urban<span>Flow</span></span>
-                </div>
+                <UrbanFlowLogo onClick={() => { setCurrentPage('landing'); setForgotStep(1); }} />
               </div>
               <h2 className="auth-visual-title">Reset Your<br/>Account Password</h2>
               <p className="auth-visual-desc">
@@ -1262,10 +1254,7 @@ export default function App() {
           {/* Right form panel */}
           <div className="auth-form-panel">
             <div className="auth-form-scroll">
-              <div className="logo" onClick={() => { setCurrentPage('landing'); setForgotStep(1); }} style={{ marginBottom: '32px' }}>
-                <div className="logo-icon"><i className="fas fa-traffic-light"></i></div>
-                <span className="logo-text">Urban<span>Flow</span></span>
-              </div>
+              <UrbanFlowLogo onClick={() => { setCurrentPage('landing'); setForgotStep(1); }} style={{ marginBottom: '32px' }} />
 
               <div className="auth-form-header">
                 <h1 className="auth-form-title">Forgot Password</h1>
@@ -1364,10 +1353,7 @@ export default function App() {
           <div className="auth-visual">
             <div className="auth-visual-inner">
               <div className="auth-visual-logo">
-                <div className="logo" onClick={() => setCurrentPage('landing')}>
-                  <div className="logo-icon"><i className="fas fa-traffic-light"></i></div>
-                  <span className="logo-text">Urban<span>Flow</span></span>
-                </div>
+                <UrbanFlowLogo onClick={() => setCurrentPage('landing')} />
               </div>
               <h2 className="auth-visual-title">Join UrbanFlow<br/>Today</h2>
               <p className="auth-visual-desc">
@@ -1397,10 +1383,7 @@ export default function App() {
           {/* Right panel Form */}
           <div className="auth-form-panel" style={{ overflowY: 'auto' }}>
             <div className="auth-form-scroll" style={{ padding: '24px 0' }}>
-              <div className="logo" onClick={() => setCurrentPage('landing')} style={{ marginBottom: '28px' }}>
-                <div className="logo-icon"><i className="fas fa-traffic-light"></i></div>
-                <span className="logo-text">Urban<span>Flow</span></span>
-              </div>
+              <UrbanFlowLogo onClick={() => setCurrentPage('landing')} style={{ marginBottom: '28px' }} />
 
               <div className="auth-form-header">
                 <h1 className="auth-form-title">Create Account</h1>
@@ -1666,10 +1649,7 @@ export default function App() {
           <aside className={`admin-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
             <div className="admin-sidebar-header">
               <div className="admin-sidebar-logo">
-                <div className="logo-icon">
-                  <i className="fas fa-traffic-light"></i>
-                </div>
-                <span className="logo-text" style={{ color: 'var(--admin-text-main)' }}>Urban<span style={{ color: 'var(--admin-accent-cyan)' }}>Flow</span></span>
+                <UrbanFlowLogo showText={!isSidebarCollapsed} textColor="var(--admin-text-main)" />
               </div>
               <button 
                 onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
