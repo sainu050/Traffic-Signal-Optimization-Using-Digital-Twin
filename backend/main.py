@@ -1062,11 +1062,14 @@ def send_email_notification(recipient: str, subject: str, plain_body: str, html_
         import ssl
         from email.mime.multipart import MIMEMultipart
         from email.mime.text import MIMEText
+        from email.utils import formatdate, make_msgid
 
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"] = f"UrbanFlow Admin <{smtp_email}>"
+        msg["From"] = f"UrbanFlow Administration <{smtp_email}>"
         msg["To"] = recipient
+        msg["Date"] = formatdate(localtime=True)
+        msg["Message-ID"] = make_msgid(domain="gmail.com")
 
         part1 = MIMEText(plain_body, "plain", "utf-8")
         msg.attach(part1)
