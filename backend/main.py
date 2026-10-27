@@ -1642,12 +1642,7 @@ def run_simulation_thread():
     state_string = "GGGGrrrrrrrrrrrr"
     idle_ticks = 0
 
-    # Initialize SUMO in background thread so HTTP server boots instantaneously
-    try:
-        if not sim.sumo_started:
-            sim.start_sumo()
-    except Exception as e:
-        print(f"[SUMO] Background initialization note: {e}")
+    # Lazy-load SUMO: start on-demand when clients connect to stay under Render's 512MB RAM cap
     
     while True:
         # Check active WebSocket clients

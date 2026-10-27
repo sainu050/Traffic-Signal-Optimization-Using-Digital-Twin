@@ -71,7 +71,7 @@ class TrafficSimulation:
                 "--threads", "1",
                 "--duration-log.disable",
                 "--step-length", "0.08"
-            ], numRetries=20)
+            ], numRetries=5)
             self.sumo_started = True
             print("[SUMO] TraCI engine initialized successfully.")
         except Exception as e:
