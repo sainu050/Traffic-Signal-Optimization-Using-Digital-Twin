@@ -970,7 +970,9 @@ export default function App() {
         setIncidentCustomLocation('');
         fetchPublicIncidents();
       } else {
-        addToast('Failed to submit incident report. Please try again.', 'error');
+        const errData = await res.json().catch(() => null);
+        const errMsg = errData?.detail || 'Failed to submit incident report. Please try again.';
+        addToast(errMsg, 'error');
       }
     } catch (err) {
       addToast(`Server connection error: ${err.message}`, 'error');

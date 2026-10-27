@@ -84,6 +84,7 @@ CREATE TABLE incident (
     reported_by INT REFERENCES users(user_id) ON DELETE SET NULL,
     intersection_id INT REFERENCES intersections(intersection_id) ON DELETE CASCADE,
     type VARCHAR(50) NOT NULL,
+    priority VARCHAR(20) DEFAULT 'Moderate',
     description TEXT,
     location VARCHAR(255) NOT NULL,
     status VARCHAR(20) DEFAULT 'PENDING',
